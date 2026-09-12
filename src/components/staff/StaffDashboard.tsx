@@ -69,6 +69,14 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   const [selectedPickupId, setSelectedPickupId] = useState<string>(
     pickups[0]?.id || "",
   );
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string>(
+    appointments[0]?.id || "",
+  );
+  const [staffModal, setStaffModal] = useState<null | {
+    kind: "intake" | "pickup" | "appointment";
+    pickupId?: string;
+    appointmentId?: string;
+  }>(null);
   const [milestoneStatus, setMilestoneStatus] =
     useState<ShipmentStatus>("in_transit");
   const [milestoneTitle, setMilestoneTitle] = useState(
@@ -293,10 +301,44 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
     onAddShipment(newShipment);
     setIntakeSuccess(trackingId);
     setNewTrackingNum("");
+    setStaffModal(null);
   };
 
   const selectedPickup =
     pickups.find((p) => p.id === selectedPickupId) || pickups[0];
+  const selectedAppointment =
+    appointments.find((a) => a.id === selectedAppointmentId) || appointments[0];
+  const modalPickup =
+    staffModal?.kind === "pickup"
+      ? pickups.find(
+          (p) => p.id === (staffModal.pickupId || selectedPickupId),
+        ) || pickups[0]
+      : null;
+  const modalAppointment =
+    staffModal?.kind === "appointment"
+      ? appointments.find(
+          (a) => a.id === (staffModal.appointmentId || selectedAppointmentId),
+        ) || appointments[0]
+      : null;
+
+  const handleAppointmentStatusUpdate = (
+    appointment: Appointment,
+    nextStatus: Appointment["status"],
+  ) => {
+    const updatedAppointment: Appointment = {
+      ...appointment,
+      status: nextStatus,
+      assignedAssociateId:
+        nextStatus === "confirmed" || nextStatus === "in_progress"
+          ? "assoc-front-desk-01"
+          : appointment.assignedAssociateId,
+      updatedAt: new Date().toISOString(),
+    };
+    onUpdateAppointment?.(updatedAppointment);
+    if (nextStatus === "confirmed") {
+      setSelectedAppointmentId(updatedAppointment.id);
+    }
+  };
 
   const handleAddMilestone = (e: React.FormEvent) => {
     e.preventDefault();
@@ -408,148 +450,157 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
       {/* TAB 1: Counter Intake */}
       {activeStaffTab === "intake" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <form
-            onSubmit={handleCreateShipment}
-            className="lg:col-span-7 bg-white rounded-3xl border border-gray-200/80 p-6 sm:p-8 shadow-xs space-y-5"
-          >
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">
-                New Package Intake
-              </h3>
-              <p className="text-xs text-gray-500">
-                Weigh package, generate tracking barcode, and assign carrier.
-              </p>
+          <div className="lg:col-span-7 bg-white rounded-3xl border border-gray-200/80 p-6 sm:p-8 shadow-xs space-y-5">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  New Package Intake
+                </h3>
+                <p className="text-xs text-gray-500">
+                  Weigh package, generate tracking barcode, and assign carrier.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStaffModal({ kind: "intake" })}
+                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
+              >
+                Open Intake Modal
+              </button>
             </div>
 
-            {intakeSuccess && (
-              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between animate-in fade-in">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>
-                    Created shipment <strong>{intakeSuccess}</strong>{" "}
-                    successfully!
-                  </span>
+            <form onSubmit={handleCreateShipment} className="space-y-5">
+              {intakeSuccess && (
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>
+                      Created shipment <strong>{intakeSuccess}</strong>{" "}
+                      successfully!
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      printShipmentLabel(
+                        shipments.find(
+                          (shipment) =>
+                            shipment.trackingNumber === intakeSuccess,
+                        ) || shipments[0],
+                      )
+                    }
+                    className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Printer className="w-3 h-3" /> Print Label
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    printShipmentLabel(
-                      shipments.find(
-                        (shipment) => shipment.trackingNumber === intakeSuccess,
-                      ) || shipments[0],
-                    )
-                  }
-                  className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg font-bold flex items-center gap-1 cursor-pointer"
-                >
-                  <Printer className="w-3 h-3" /> Print Label
-                </button>
-              </div>
-            )}
+              )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Carrier
+                  </label>
+                  <select
+                    value={carrier}
+                    onChange={(e) => setCarrier(e.target.value as Carrier)}
+                    className="w-full p-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:outline-none"
+                  >
+                    <option value="fedex">FedEx Express / Ground</option>
+                    <option value="ups">UPS Ground / Air</option>
+                    <option value="usps">USPS Priority / Express</option>
+                    <option value="jb_freight">JB Local Courier Van</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Service Level
+                  </label>
+                  <input
+                    type="text"
+                    value={service}
+                    onChange={(e) => setService(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Weight (lbs)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={weight}
+                    onChange={(e) => setWeight(Number(e.target.value))}
+                    className="w-full p-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Declared Value ($)
+                  </label>
+                  <input
+                    type="number"
+                    value={declaredValue}
+                    onChange={(e) => setDeclaredValue(Number(e.target.value))}
+                    className="w-full p-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Recipient Name
+                  </label>
+                  <input
+                    type="text"
+                    value={recipientName}
+                    onChange={(e) => setRecipientName(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Destination City
+                  </label>
+                  <input
+                    type="text"
+                    value={recipientCity}
+                    onChange={(e) => setRecipientCity(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Carrier
-                </label>
-                <select
-                  value={carrier}
-                  onChange={(e) => setCarrier(e.target.value as Carrier)}
-                  className="w-full p-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:outline-none"
-                >
-                  <option value="fedex">FedEx Express / Ground</option>
-                  <option value="ups">UPS Ground / Air</option>
-                  <option value="usps">USPS Priority / Express</option>
-                  <option value="jb_freight">JB Local Courier Van</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Service Level
+                  Custom Barcode ID (Optional)
                 </label>
                 <input
                   type="text"
-                  value={service}
-                  onChange={(e) => setService(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Weight (lbs)
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={weight}
-                  onChange={(e) => setWeight(Number(e.target.value))}
+                  placeholder="Leave blank to auto-generate (e.g. JB-8890-US)"
+                  value={newTrackingNum}
+                  onChange={(e) => setNewTrackingNum(e.target.value)}
                   className="w-full p-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:outline-none"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Declared Value ($)
-                </label>
-                <input
-                  type="number"
-                  value={declaredValue}
-                  onChange={(e) => setDeclaredValue(Number(e.target.value))}
-                  className="w-full p-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Recipient Name
-                </label>
-                <input
-                  type="text"
-                  value={recipientName}
-                  onChange={(e) => setRecipientName(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Destination City
-                </label>
-                <input
-                  type="text"
-                  value={recipientCity}
-                  onChange={(e) => setRecipientCity(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Custom Barcode ID (Optional)
-              </label>
-              <input
-                type="text"
-                placeholder="Leave blank to auto-generate (e.g. JB-8890-US)"
-                value={newTrackingNum}
-                onChange={(e) => setNewTrackingNum(e.target.value)}
-                className="w-full p-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:outline-none"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>Register Intake & Generate Barcode</span>
-            </button>
-          </form>
+              <button
+                type="submit"
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>Register Intake & Generate Barcode</span>
+              </button>
+            </form>
+          </div>
 
           {/* Active Store Shipments List */}
           <div className="lg:col-span-5 bg-white rounded-3xl border border-gray-200/80 p-6 shadow-xs space-y-4">
@@ -650,10 +701,13 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                   <div className="flex items-center gap-2 shrink-0 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => setSelectedPickupId(p.id)}
+                      onClick={() => {
+                        setSelectedPickupId(p.id);
+                        setStaffModal({ kind: "pickup", pickupId: p.id });
+                      }}
                       className="px-3 py-2 bg-slate-900 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition cursor-pointer"
                     >
-                      Scan Details
+                      Dispatch Modal
                     </button>
                     {p.status === "scheduled" && (
                       <button
@@ -875,44 +929,449 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
 
       {/* TAB 4: Appointments Queue */}
       {activeStaffTab === "appointments" && (
-        <div className="bg-white rounded-3xl border border-gray-200/80 p-6 shadow-xs space-y-4">
-          <h3 className="text-lg font-bold text-gray-900">
-            Today&apos;s Store Appointment Check-Ins
-          </h3>
-          <div className="space-y-3">
-            {appointments.map((a) => (
-              <div
-                key={a.id}
-                className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80 flex items-center justify-between text-xs"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-gray-900">
-                      {a.customerName}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
-                      {a.status}
-                    </span>
+        <div className="grid grid-cols-1 xl:grid-cols-[1.5fr_0.8fr] gap-5">
+          <div className="bg-white rounded-3xl border border-gray-200/80 p-6 shadow-xs space-y-4">
+            <h3 className="text-lg font-bold text-gray-900">
+              Today&apos;s Store Appointment Check-Ins
+            </h3>
+            <div className="space-y-3">
+              {appointments.map((a) => {
+                const actionLabel =
+                  a.status === "pending"
+                    ? "Accept Appointment"
+                    : a.status === "confirmed"
+                      ? "Sign In Customer"
+                      : a.status === "in_progress"
+                        ? "Mark Visit Complete"
+                        : "Completed";
+
+                return (
+                  <div
+                    key={a.id}
+                    className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedAppointmentId(a.id);
+                        setStaffModal({
+                          kind: "appointment",
+                          appointmentId: a.id,
+                        });
+                      }}
+                      className="text-left flex-1"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-gray-900">
+                          {a.customerName}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                          {a.status}
+                        </span>
+                      </div>
+                      <p className="text-gray-600 capitalize">
+                        {a.serviceType.replace(/_/g, " ")}
+                      </p>
+                      <p className="text-gray-400">
+                        {a.appointmentDate} at {a.timeSlot} • {a.customerPhone}
+                      </p>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        if (a.status === "pending") {
+                          handleAppointmentStatusUpdate(a, "confirmed");
+                          return;
+                        }
+                        if (a.status === "confirmed") {
+                          handleAppointmentStatusUpdate(a, "in_progress");
+                          return;
+                        }
+                        if (a.status === "in_progress") {
+                          handleAppointmentStatusUpdate(a, "completed");
+                        }
+                      }}
+                      disabled={a.status === "completed"}
+                      className={`px-3 py-1.5 rounded-xl font-semibold transition cursor-pointer ${
+                        a.status === "completed"
+                          ? "bg-emerald-100 text-emerald-700 cursor-default"
+                          : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                      }`}
+                    >
+                      {actionLabel}
+                    </button>
                   </div>
-                  <p className="text-gray-600 capitalize">
-                    {a.serviceType.replace(/_/g, " ")}
+                );
+              })}
+            </div>
+          </div>
+
+          {selectedAppointment && (
+            <div className="bg-slate-900 text-white rounded-3xl p-5 shadow-sm border border-slate-800">
+              <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-700">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">
+                    Appointment details
                   </p>
-                  <p className="text-gray-400">
-                    {a.appointmentDate} at {a.timeSlot} • {a.customerPhone}
-                  </p>
+                  <h4 className="text-lg font-bold mt-1">
+                    {selectedAppointment.customerName}
+                  </h4>
                 </div>
-                <button
-                  onClick={() =>
-                    alert(
-                      `Customer ${a.customerName} checked in at store desk.`,
-                    )
-                  }
-                  className="px-3 py-1.5 bg-blue-50 text-blue-700 font-semibold rounded-xl hover:bg-blue-100 transition cursor-pointer"
-                >
-                  Check In Desk
-                </button>
+                <span className="rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em]">
+                  {selectedAppointment.status}
+                </span>
               </div>
-            ))}
+
+              <div className="mt-4 space-y-2 text-xs text-slate-300">
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-400">Service</span>
+                  <span className="font-semibold text-white capitalize">
+                    {selectedAppointment.serviceType.replace(/_/g, " ")}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-400">Date</span>
+                  <span className="font-semibold text-white">
+                    {selectedAppointment.appointmentDate}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-400">Time</span>
+                  <span className="font-semibold text-white">
+                    {selectedAppointment.timeSlot}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-400">Phone</span>
+                  <span className="font-semibold text-white">
+                    {selectedAppointment.customerPhone}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-400">Assigned</span>
+                  <span className="font-semibold text-white">
+                    {selectedAppointment.assignedAssociateId || "Unassigned"}
+                  </span>
+                </div>
+                {selectedAppointment.notes && (
+                  <div className="pt-2 border-t border-slate-700 text-slate-300">
+                    <p className="text-slate-400 mb-1">Notes</p>
+                    <p className="font-medium text-white leading-relaxed">
+                      {selectedAppointment.notes}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {staffModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl border border-gray-200 animate-in zoom-in-95">
+            {staffModal.kind === "intake" && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">
+                      Counter Intake
+                    </p>
+                    <h3 className="mt-1 text-xl font-bold text-gray-900">
+                      Register New Parcel
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStaffModal(null)}
+                    className="rounded-full bg-gray-100 px-2 py-1 text-gray-600 hover:bg-gray-200 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={handleCreateShipment}
+                  className="space-y-4 text-xs sm:text-sm"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1 block text-gray-700 font-semibold">
+                        Carrier
+                      </label>
+                      <select
+                        value={carrier}
+                        onChange={(e) => setCarrier(e.target.value as Carrier)}
+                        className="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none"
+                      >
+                        <option value="fedex">FedEx</option>
+                        <option value="ups">UPS</option>
+                        <option value="usps">USPS</option>
+                        <option value="jb_freight">JB Freight</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-gray-700 font-semibold">
+                        Service Level
+                      </label>
+                      <input
+                        type="text"
+                        value={service}
+                        onChange={(e) => setService(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-gray-700 font-semibold">
+                        Weight (lbs)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={weight}
+                        onChange={(e) => setWeight(Number(e.target.value))}
+                        className="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-gray-700 font-semibold">
+                        Declared Value ($)
+                      </label>
+                      <input
+                        type="number"
+                        value={declaredValue}
+                        onChange={(e) =>
+                          setDeclaredValue(Number(e.target.value))
+                        }
+                        className="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-gray-700 font-semibold">
+                        Recipient Name
+                      </label>
+                      <input
+                        type="text"
+                        value={recipientName}
+                        onChange={(e) => setRecipientName(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-gray-700 font-semibold">
+                        Destination City
+                      </label>
+                      <input
+                        type="text"
+                        value={recipientCity}
+                        onChange={(e) => setRecipientCity(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-gray-700 font-semibold">
+                      Custom Barcode ID (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={newTrackingNum}
+                      onChange={(e) => setNewTrackingNum(e.target.value)}
+                      className="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setStaffModal(null)}
+                      className="w-1/2 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="w-1/2 py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition cursor-pointer"
+                    >
+                      Register Package
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {staffModal.kind === "pickup" && modalPickup && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-600">
+                      Dispatch Queue
+                    </p>
+                    <h3 className="mt-1 text-xl font-bold text-gray-900">
+                      {modalPickup.contactName}
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStaffModal(null)}
+                    className="rounded-full bg-gray-100 px-2 py-1 text-gray-600 hover:bg-gray-200 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-700">
+                  <div className="rounded-2xl bg-gray-50 p-3">
+                    <strong>Address:</strong> {modalPickup.pickupAddress.street}
+                    , {modalPickup.pickupAddress.city}
+                  </div>
+                  <div className="rounded-2xl bg-gray-50 p-3">
+                    <strong>Phone:</strong> {modalPickup.contactPhone}
+                  </div>
+                  <div className="rounded-2xl bg-gray-50 p-3">
+                    <strong>Carrier:</strong> {modalPickup.preferredCarrier}
+                  </div>
+                  <div className="rounded-2xl bg-gray-50 p-3">
+                    <strong>Pickup:</strong> {modalPickup.pickupDate}
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  {modalPickup.status === "scheduled" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onUpdatePickup({
+                          ...modalPickup,
+                          status: "in_route",
+                          assignedDriverId: "Driver-Van-01",
+                        });
+                        setStaffModal(null);
+                      }}
+                      className="w-1/2 py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition cursor-pointer"
+                    >
+                      Assign Van
+                    </button>
+                  )}
+                  {modalPickup.status === "in_route" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onUpdatePickup({ ...modalPickup, status: "completed" });
+                        setStaffModal(null);
+                      }}
+                      className="w-1/2 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition cursor-pointer"
+                    >
+                      Mark Collected
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setStaffModal(null)}
+                    className="w-1/2 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {staffModal.kind === "appointment" && modalAppointment && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-green-600">
+                      Appointment
+                    </p>
+                    <h3 className="mt-1 text-xl font-bold text-gray-900">
+                      {modalAppointment.customerName}
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStaffModal(null)}
+                    className="rounded-full bg-gray-100 px-2 py-1 text-gray-600 hover:bg-gray-200 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-700">
+                  <div className="rounded-2xl bg-gray-50 p-3">
+                    <strong>Service:</strong>{" "}
+                    {modalAppointment.serviceType.replace(/_/g, " ")}
+                  </div>
+                  <div className="rounded-2xl bg-gray-50 p-3">
+                    <strong>Status:</strong> {modalAppointment.status}
+                  </div>
+                  <div className="rounded-2xl bg-gray-50 p-3">
+                    <strong>Date:</strong> {modalAppointment.appointmentDate}
+                  </div>
+                  <div className="rounded-2xl bg-gray-50 p-3">
+                    <strong>Time:</strong> {modalAppointment.timeSlot}
+                  </div>
+                  <div className="rounded-2xl bg-gray-50 p-3 sm:col-span-2">
+                    <strong>Phone:</strong> {modalAppointment.customerPhone}
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  {modalAppointment.status === "pending" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleAppointmentStatusUpdate(
+                          modalAppointment,
+                          "confirmed",
+                        );
+                        setStaffModal(null);
+                      }}
+                      className="w-1/2 py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition cursor-pointer"
+                    >
+                      Accept
+                    </button>
+                  )}
+                  {modalAppointment.status === "confirmed" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleAppointmentStatusUpdate(
+                          modalAppointment,
+                          "in_progress",
+                        );
+                        setStaffModal(null);
+                      }}
+                      className="w-1/2 py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition cursor-pointer"
+                    >
+                      Sign In
+                    </button>
+                  )}
+                  {modalAppointment.status === "in_progress" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleAppointmentStatusUpdate(
+                          modalAppointment,
+                          "completed",
+                        );
+                        setStaffModal(null);
+                      }}
+                      className="w-1/2 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition cursor-pointer"
+                    >
+                      Complete Visit
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setStaffModal(null)}
+                    className="w-1/2 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

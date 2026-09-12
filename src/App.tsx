@@ -310,6 +310,12 @@ export default function App() {
     setPickups((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   };
 
+  const handleUpdateAppointment = (updated: Appointment) => {
+    setAppointments((prev) =>
+      prev.map((apt) => (apt.id === updated.id ? updated : apt)),
+    );
+  };
+
   const handleQuickTrack = (trackingNo: string) => {
     const trimmed = trackingNo.trim();
     if (!trimmed) {
@@ -381,6 +387,7 @@ export default function App() {
               onAddShipment={handleAddShipment}
               onUpdateShipment={handleUpdateShipment}
               onUpdatePickup={handleUpdatePickup}
+              onUpdateAppointment={handleUpdateAppointment}
               onSwitchToConsumer={() => setPortal("consumer")}
               onSwitchToAdmin={() => setPortal("admin")}
             />
