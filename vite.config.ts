@@ -5,6 +5,8 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    root: path.resolve(__dirname, 'public'),
+    publicDir: path.resolve(__dirname, 'public/assets'),
     plugins: [react(), tailwindcss()],
     define: {
       global: 'globalThis',
