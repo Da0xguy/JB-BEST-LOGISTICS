@@ -43,6 +43,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   onAddShipment,
   onUpdateShipment,
   onUpdatePickup,
+  onUpdateAppointment,
   onSwitchToConsumer,
   onSwitchToAdmin,
 }) => {
