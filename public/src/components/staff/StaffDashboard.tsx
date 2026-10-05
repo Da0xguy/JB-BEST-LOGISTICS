@@ -33,7 +33,6 @@ interface StaffDashboardProps {
   appointments: Appointment[];
   onAddShipment: (shipment: Shipment) => void;
   onUpdateShipment: (shipment: Shipment) => void;
-  onUpdatePickup: (pickup: PickupRequest) => void;
   onUpdateAppointment?: (appointment: Appointment) => void;
 }
 
@@ -43,7 +42,6 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   appointments,
   onAddShipment,
   onUpdateShipment,
-  onUpdatePickup,
   onUpdateAppointment,
 }) => {
   const [activeStaffTab, setActiveStaffTab] = useState<
@@ -79,8 +77,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
     appointments[0]?.id || "",
   );
   const [staffModal, setStaffModal] = useState<null | {
-    kind: "intake" | "pickup" | "appointment";
-    pickupId?: string;
+    kind: "intake" | "appointment";
     appointmentId?: string;
   }>(null);
   const [milestoneStatus, setMilestoneStatus] =
@@ -314,12 +311,6 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
     pickups.find((p) => p.id === selectedPickupId) || pickups[0];
   const selectedAppointment =
     appointments.find((a) => a.id === selectedAppointmentId) || appointments[0];
-  const modalPickup =
-    staffModal?.kind === "pickup"
-      ? pickups.find(
-          (p) => p.id === (staffModal.pickupId || selectedPickupId),
-        ) || pickups[0]
-      : null;
   const modalAppointment =
     staffModal?.kind === "appointment"
       ? appointments.find(
@@ -633,13 +624,16 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                 Doorstep Collection Dispatch Queue
               </h3>
               <p className="text-xs text-gray-500">
-                Assign pickup requests to courier vans and update pickup
-                completion.
+                New requests are offered automatically to available riders.
               </p>
             </div>
             <span className="text-xs font-semibold text-amber-800 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
-              {pickups.filter((p) => p.status !== "completed").length} Pending
-              Dispatch
+              {
+                pickups.filter(
+                  (p) => !["completed", "cancelled"].includes(p.status),
+                ).length
+              }{" "}
+              Open
             </span>
           </div>
 
@@ -676,6 +670,9 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                       - {p.closeTime}) • {p.estimatedPackagesCount} boxes (
                       {p.totalWeightLbs} lbs)
                     </p>
+                    <p className="text-gray-600">
+                      Rider: {p.assignedDriverId || "Automatic offer pending"}
+                    </p>
                     {p.specialInstructions && (
                       <p className="text-amber-800 font-medium bg-amber-50 p-2 rounded-xl mt-1 border border-amber-200/60">
                         ⚠️ Note / Gate Code: {p.specialInstructions}
@@ -686,38 +683,11 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                   <div className="flex items-center gap-2 shrink-0 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedPickupId(p.id);
-                        setStaffModal({ kind: "pickup", pickupId: p.id });
-                      }}
-                      className="px-3 py-2 bg-slate-900 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition cursor-pointer"
+                      onClick={() => setSelectedPickupId(p.id)}
+                      className="px-3 py-2 border border-gray-300 bg-white text-gray-700 text-xs font-semibold rounded-xl transition hover:bg-gray-50"
                     >
-                      Dispatch Modal
+                      View details
                     </button>
-                    {p.status === "scheduled" && (
-                      <button
-                        onClick={() =>
-                          onUpdatePickup({
-                            ...p,
-                            status: "in_route",
-                            assignedDriverId: "Driver-Van-01",
-                          })
-                        }
-                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition cursor-pointer"
-                      >
-                        Assign Van & Dispatch
-                      </button>
-                    )}
-                    {p.status === "in_route" && (
-                      <button
-                        onClick={() =>
-                          onUpdatePickup({ ...p, status: "completed" })
-                        }
-                        className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition cursor-pointer"
-                      >
-                        Mark Collected
-                      </button>
-                    )}
                     {p.status === "completed" && (
                       <span className="text-xs text-emerald-700 font-bold flex items-center gap-1">
                         <CheckCircle2 className="w-4 h-4" /> Picked Up
@@ -733,29 +703,15 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                 <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-700">
                   <div>
                     <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">
-                      Pickup QR Sync
+                      Automatic rider dispatch
                     </p>
                     <h4 className="text-lg font-bold mt-1">
                       {selectedPickup.trackingNumber || selectedPickup.id}
                     </h4>
                   </div>
-                  <span className="rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em]">
-                    Live
+                  <span className="rounded-full bg-slate-700 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-200">
+                    {selectedPickup.status.replaceAll("_", " ")}
                   </span>
-                </div>
-
-                <div className="mt-4 flex items-center justify-center rounded-2xl border border-slate-700 bg-slate-800 p-4">
-                  {selectedPickup.qrCode ? (
-                    <img
-                      src={selectedPickup.qrCode}
-                      alt={`QR code for pickup ${selectedPickup.trackingNumber || selectedPickup.id}`}
-                      className="h-28 w-28 rounded-xl border border-slate-700 bg-white p-2"
-                    />
-                  ) : (
-                    <div className="text-center text-slate-300 text-xs">
-                      QR code unavailable for this pickup.
-                    </div>
-                  )}
                 </div>
 
                 <div className="mt-5 space-y-2 text-xs text-slate-300">
@@ -792,15 +748,6 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                       {selectedPickup.pickupAddress.zip}
                     </p>
                   </div>
-
-                  {selectedPickup.qrPayload && (
-                    <div className="pt-3 border-t border-slate-700 text-slate-300">
-                      <p className="text-slate-400 mb-1">Scanned order data</p>
-                      <pre className="max-h-28 overflow-auto rounded-xl border border-slate-700 bg-slate-800 p-2 text-[10px] leading-relaxed whitespace-pre-wrap text-slate-100">
-                        {selectedPickup.qrPayload}
-                      </pre>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -1183,82 +1130,6 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                     </button>
                   </div>
                 </form>
-              </div>
-            )}
-
-            {staffModal.kind === "pickup" && modalPickup && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-600">
-                      Dispatch Queue
-                    </p>
-                    <h3 className="mt-1 text-xl font-bold text-gray-900">
-                      {modalPickup.contactName}
-                    </h3>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setStaffModal(null)}
-                    className="rounded-full bg-gray-100 px-2 py-1 text-gray-600 hover:bg-gray-200 cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-700">
-                  <div className="rounded-2xl bg-gray-50 p-3">
-                    <strong>Address:</strong> {modalPickup.pickupAddress.street}
-                    , {modalPickup.pickupAddress.city}
-                  </div>
-                  <div className="rounded-2xl bg-gray-50 p-3">
-                    <strong>Phone:</strong> {modalPickup.contactPhone}
-                  </div>
-                  <div className="rounded-2xl bg-gray-50 p-3">
-                    <strong>Carrier:</strong> {modalPickup.preferredCarrier}
-                  </div>
-                  <div className="rounded-2xl bg-gray-50 p-3">
-                    <strong>Pickup:</strong> {modalPickup.pickupDate}
-                  </div>
-                </div>
-
-                <div className="flex gap-2 pt-2">
-                  {modalPickup.status === "scheduled" && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onUpdatePickup({
-                          ...modalPickup,
-                          status: "in_route",
-                          assignedDriverId: "Driver-Van-01",
-                        });
-                        setStaffModal(null);
-                      }}
-                      className="w-1/2 py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition cursor-pointer"
-                    >
-                      Assign Van
-                    </button>
-                  )}
-                  {modalPickup.status === "in_route" && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onUpdatePickup({ ...modalPickup, status: "completed" });
-                        setStaffModal(null);
-                      }}
-                      className="w-1/2 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition cursor-pointer"
-                    >
-                      Mark Collected
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setStaffModal(null)}
-                    className="w-1/2 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition cursor-pointer"
-                  >
-                    Close
-                  </button>
-                </div>
               </div>
             )}
 

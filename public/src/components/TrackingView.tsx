@@ -19,11 +19,11 @@ import {
   Package,
 } from "lucide-react";
 import { Shipment, ShipmentStatus } from "../types";
+import { getShipmentByTrackingNumber } from "../lib/api";
 
 interface TrackingViewProps {
   shipments: Shipment[];
   initialTrackingId?: string;
-  onUpdateShipment: (updated: Shipment) => void;
 }
 
 const MILESTONES: {
@@ -61,44 +61,58 @@ const MILESTONES: {
 export const TrackingView: React.FC<TrackingViewProps> = ({
   shipments,
   initialTrackingId,
-  onUpdateShipment,
 }) => {
-  const [searchQuery, setSearchQuery] = useState(
-    initialTrackingId || "JB-8829-US",
-  );
-  const [selectedId, setSelectedId] = useState(
-    initialTrackingId || "JB-8829-US",
-  );
+  const [searchQuery, setSearchQuery] = useState(initialTrackingId || "");
+  const [selectedId, setSelectedId] = useState(initialTrackingId || "");
+  const [trackedShipment, setTrackedShipment] = useState<Shipment | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [trackingError, setTrackingError] = useState("");
   const [showOptionalSpecs, setShowOptionalSpecs] = useState(false);
 
   useEffect(() => {
     if (initialTrackingId) {
       setSelectedId(initialTrackingId);
       setSearchQuery(initialTrackingId);
+      void lookupShipment(initialTrackingId);
     }
   }, [initialTrackingId]);
 
   const currentShipment =
+    trackedShipment ||
     shipments.find(
       (s) =>
         s.trackingNumber.toLowerCase() === selectedId.toLowerCase() ||
         s.id === selectedId,
-    ) || shipments[0];
+    ) ||
+    (!selectedId ? shipments[0] : undefined);
+
+  const lookupShipment = async (trackingNumber: string) => {
+    setIsUpdating(true);
+    setTrackingError("");
+    try {
+      const shipment = await getShipmentByTrackingNumber(trackingNumber);
+      setTrackedShipment(shipment);
+      setSelectedId(shipment.trackingNumber);
+      setSearchQuery(shipment.trackingNumber);
+    } catch (error) {
+      setTrackedShipment(null);
+      setTrackingError(
+        error instanceof Error ? error.message : "Tracking lookup failed.",
+      );
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
-
-    const found = shipments.find(
-      (s) =>
-        s.trackingNumber.toLowerCase() === searchQuery.trim().toLowerCase(),
-    );
-    if (found) {
-      setSelectedId(found.trackingNumber);
-    } else {
-      setSelectedId(searchQuery.trim().toUpperCase());
+    const trackingNumber = searchQuery.trim().toUpperCase();
+    if (!/^[A-Z0-9]{20}$/.test(trackingNumber)) {
+      setTrackingError("Enter a 20-character alphanumeric tracking ID.");
+      return;
     }
+    setSelectedId(trackingNumber);
+    void lookupShipment(trackingNumber);
   };
 
   const getStatusIndex = (status: ShipmentStatus) => {
@@ -113,7 +127,7 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
   };
 
   const currentIndex = currentShipment
-    ? getStatusIndex(currentShipment.currentStatus)
+    ? Math.max(0, getStatusIndex(currentShipment.currentStatus))
     : 0;
 
   const getCarrierBadge = (carrier: string) => {
@@ -142,73 +156,7 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
   };
 
   const handleRefreshStatus = () => {
-    if (!currentShipment) return;
-    setIsUpdating(true);
-
-    setTimeout(() => {
-      let nextStatus: ShipmentStatus = "delivered";
-      let title = "Delivered to Recipient";
-      let desc = "Package signed and released safely at front door.";
-
-      if (currentShipment.currentStatus === "order_created") {
-        nextStatus = "picked_up";
-        title = "Picked Up by Courier";
-        desc = "Sorted at Atlanta Hub.";
-      } else if (currentShipment.currentStatus === "picked_up") {
-        nextStatus = "in_transit";
-        title = "In Transit";
-        desc = "Moving smoothly towards destination.";
-      } else if (currentShipment.currentStatus === "in_transit") {
-        nextStatus = "out_for_delivery";
-        title = "Out for Delivery";
-        desc = "Package is on the delivery vehicle.";
-      } else if (currentShipment.currentStatus === "out_for_delivery") {
-        nextStatus = "delivered";
-        title = "Delivered & Signed";
-        desc = "Package was delivered and signed for.";
-      } else {
-        nextStatus = "in_transit";
-        title = "In Transit Checkpoint";
-        desc = "Routine automated scan at regional sorting hub.";
-      }
-
-      const newLog = {
-        id: `log-${Date.now()}`,
-        shipmentId: currentShipment.id,
-        status: nextStatus,
-        title,
-        description: desc,
-        location: {
-          city:
-            nextStatus === "delivered"
-              ? currentShipment.destinationLocation.city
-              : "Madison",
-          state: "GA",
-          country: "USA",
-          latitude: currentShipment.destinationLocation.latitude,
-          longitude: currentShipment.destinationLocation.longitude,
-          facilityName:
-            nextStatus === "delivered"
-              ? "Destination Address"
-              : "East Georgia Hub",
-        },
-        timestamp: new Date().toISOString(),
-      };
-
-      const updated: Shipment = {
-        ...currentShipment,
-        currentStatus: nextStatus,
-        estimatedDelivery:
-          nextStatus === "delivered"
-            ? "Delivered Today"
-            : currentShipment.estimatedDelivery,
-        trackingLogs: [...currentShipment.trackingLogs, newLog],
-        updatedAt: new Date().toISOString(),
-      };
-
-      onUpdateShipment(updated);
-      setIsUpdating(false);
-    }, 450);
+    if (currentShipment) void lookupShipment(currentShipment.trackingNumber);
   };
 
   const carrierInfo = currentShipment
@@ -228,8 +176,7 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
               Where is your package?
             </h2>
             <p className="text-sm text-gray-500 mt-1">
-              Enter any FedEx, UPS, USPS, or JB Freight tracking number for live
-              status.
+              Enter a JB &amp; Best Logistics tracking ID for live status.
             </p>
           </div>
 
@@ -243,8 +190,17 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="e.g. JB-8829-US"
+                onChange={(e) =>
+                  setSearchQuery(
+                    e.target.value
+                      .replace(/[^a-z0-9]/gi, "")
+                      .slice(0, 20)
+                      .toUpperCase(),
+                  )
+                }
+                placeholder="20-character tracking ID"
+                maxLength={20}
+                autoCapitalize="characters"
                 className="w-full pl-10 pr-3 py-2.5 bg-gray-50 rounded-xl border border-gray-200 text-gray-900 placeholder:text-gray-400 text-sm font-medium focus:bg-white focus:border-blue-600 focus:outline-none transition"
               />
             </div>
@@ -258,15 +214,17 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
           </form>
         </div>
 
-        {/* Quick Demo Tracking Numbers */}
+        {/* Customer orders */}
         <div className="pt-3 flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-gray-500 font-medium">Quick examples:</span>
+          <span className="text-gray-500 font-medium">Your orders:</span>
           {shipments.map((s) => (
             <button
               key={s.trackingNumber}
               onClick={() => {
                 setSearchQuery(s.trackingNumber);
                 setSelectedId(s.trackingNumber);
+                setTrackedShipment(null);
+                void lookupShipment(s.trackingNumber);
               }}
               className={`px-3 py-1.5 rounded-full text-xs font-medium border transition cursor-pointer ${
                 selectedId === s.trackingNumber
@@ -280,6 +238,15 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
           ))}
         </div>
       </div>
+
+      {trackingError && (
+        <p
+          role="alert"
+          className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+        >
+          {trackingError}
+        </p>
+      )}
 
       {currentShipment && carrierInfo && (
         <div className="space-y-6">
@@ -329,7 +296,7 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
 
                 <div className="bg-blue-50/80 border border-blue-100 rounded-2xl p-4 min-w-[220px]">
                   <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">
-                    Estimated Delivery
+                    Pickup Window
                   </p>
                   <p className="text-xl font-bold text-gray-900 mt-1">
                     {currentShipment.estimatedDelivery}
@@ -427,94 +394,30 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
                   </span>
                 </div>
 
-                {/* Map Graphic */}
-                <div className="relative w-full h-[320px] bg-slate-100 overflow-hidden">
-                  <svg
-                    className="absolute inset-0 w-full h-full opacity-50 pointer-events-none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <defs>
-                      <pattern
-                        id="clean-grid"
-                        width="36"
-                        height="36"
-                        patternUnits="userSpaceOnUse"
-                      >
-                        <path
-                          d="M 36 0 L 0 0 0 36"
-                          fill="none"
-                          stroke="#cbd5e1"
-                          strokeWidth="0.8"
-                          strokeOpacity="0.5"
-                        />
-                      </pattern>
-                    </defs>
-                    <rect width="100%" height="100%" fill="url(#clean-grid)" />
-                    {/* Highway route */}
-                    <path
-                      d="M 40 260 Q 240 210, 520 120"
-                      fill="none"
-                      stroke="#94a3b8"
-                      strokeWidth="6"
-                      strokeLinecap="round"
-                    />
-                    <path
-                      d="M 40 260 Q 240 210, 520 120"
-                      fill="none"
-                      stroke="#ffffff"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                    />
-                    <path
-                      d="M 100 230 Q 260 180, 480 135"
-                      fill="none"
-                      stroke="#2563eb"
-                      strokeWidth="4"
-                      strokeDasharray="6 4"
-                      className="animate-pulse"
-                    />
-                  </svg>
-
-                  {/* Origin */}
-                  <div className="absolute left-[18%] top-[65%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-                    <div className="bg-slate-900 text-white text-[11px] font-medium px-2.5 py-1 rounded-lg shadow-sm mb-1.5 whitespace-nowrap">
-                      Origin: {currentShipment.originLocation.city},{" "}
+                <div className="grid min-h-[220px] grid-cols-1 gap-px bg-gray-200 sm:grid-cols-2">
+                  <div className="flex flex-col justify-center bg-white p-6 sm:p-8">
+                    <span className="text-xs font-semibold uppercase text-gray-500">
+                      Pickup location
+                    </span>
+                    <p className="mt-2 text-lg font-bold text-gray-900">
+                      {currentShipment.originLocation.city},{" "}
                       {currentShipment.originLocation.state}
-                    </div>
-                    <div className="w-5 h-5 rounded-full bg-slate-900 border-2 border-white shadow-sm flex items-center justify-center text-[10px] text-white font-bold">
-                      A
-                    </div>
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      {currentShipment.sender.street}
+                    </p>
                   </div>
-
-                  {/* Destination */}
-                  <div className="absolute left-[78%] top-[35%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-                    <div className="bg-emerald-700 text-white text-[11px] font-medium px-2.5 py-1 rounded-lg shadow-sm mb-1.5 whitespace-nowrap">
-                      Destination: {currentShipment.destinationLocation.city},{" "}
+                  <div className="flex flex-col justify-center bg-white p-6 sm:p-8">
+                    <span className="text-xs font-semibold uppercase text-gray-500">
+                      Delivery location
+                    </span>
+                    <p className="mt-2 text-lg font-bold text-gray-900">
+                      {currentShipment.destinationLocation.city},{" "}
                       {currentShipment.destinationLocation.state}
-                    </div>
-                    <div className="w-5 h-5 rounded-full bg-emerald-600 border-2 border-white shadow-sm flex items-center justify-center text-[10px] text-white font-bold">
-                      B
-                    </div>
-                  </div>
-
-                  {/* Moving Courier */}
-                  <div className="absolute left-[52%] top-[48%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-10">
-                    <div className="relative">
-                      <div className="w-12 h-12 rounded-full bg-blue-500/20 animate-ping absolute -inset-1" />
-                      <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md border-2 border-white relative z-10">
-                        <Truck className="w-5 h-5" />
-                      </div>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-xl p-2.5 mt-2 shadow-sm text-center max-w-[190px]">
-                      <p className="text-xs font-bold text-gray-900 leading-tight">
-                        {currentShipment.currentLocation.facilityName ||
-                          "En Route to Destination"}
-                      </p>
-                      <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-                        {currentShipment.currentLocation.city},{" "}
-                        {currentShipment.currentLocation.state}
-                      </p>
-                    </div>
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      {currentShipment.recipient.street}
+                    </p>
                   </div>
                 </div>
 

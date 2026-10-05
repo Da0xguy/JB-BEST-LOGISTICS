@@ -9,12 +9,13 @@ import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import { config } from './config';
 import { connectDatabase } from './db';
-import { ActivityLog, AppointmentBooking, MailboxProfile, Notification, Payment, PickupJob, Shipment, User, type AppointmentService, type DeliveryOption, type Role, type ShipmentStatus } from './models';
+import { ActivityLog, AppointmentBooking, MailboxProfile, Notification, Payment, PickupJob, RiderProfile, Shipment, User, type AppointmentService, type DeliveryOption, type Role, type ShipmentStatus } from './models';
 import { allowRoles, issueToken, publicUser, requireAuth, type AuthRequest } from './auth';
 import { calculateQuote, isAfterDropoffCutoff } from './pricing';
 import { ApiError } from './controllers/apiError';
 import v1Router from './routes/v1';
 import { emitToShipment, initializeRealtime } from './realtime';
+import { dispatchQueuedShipments } from './services/dispatchService';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -29,8 +30,9 @@ const asyncRoute = (handler: express.RequestHandler): express.RequestHandler => 
 };
 
 const createTrackingId = async () => {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   for (;;) {
-    const candidate = crypto.randomInt(1, 10).toString() + Array.from({ length: 19 }, () => crypto.randomInt(0, 10)).join('');
+    const candidate = Array.from({ length: 20 }, () => alphabet[crypto.randomInt(alphabet.length)]).join('');
     if (!(await Shipment.exists({ trackingId: candidate }))) return candidate;
   }
 };
@@ -261,6 +263,16 @@ app.patch('/api/shipments/:id/status', requireAuth, allowRoles('rider', 'warehou
   if (!shipment) return res.status(404).json({ error: 'Shipment not found' });
   await logActivity(req, 'status_update', 'shipment', shipment.id, { status });
   await Notification.create({ userId: shipment.customerId, shipmentId: shipment._id, channel: 'in_app', title: 'Shipment update', body: `Shipment ${shipment.trackingId} is now ${status.replaceAll('_', ' ')}.` });
+  if (['delivered', 'cancelled'].includes(status) && shipment.assignedRiderId) {
+    await Promise.all([
+      RiderProfile.updateOne({ userId: shipment.assignedRiderId }, { $set: { is_assigned: false } }),
+      PickupJob.updateMany(
+        { shipmentId: shipment._id, riderId: shipment.assignedRiderId, status: { $in: ['assigned', 'in_route'] } },
+        { $set: { status: status === 'delivered' ? 'completed' : 'failed' } },
+      ),
+    ]);
+    void dispatchQueuedShipments().catch((error: unknown) => console.error('Queued dispatch retry failed', error));
+  }
   emitToShipment(shipment._id.toString(), 'tracking:status', { trackingNumber: shipment.trackingId, status: shipment.status, history: shipment.tracking_history });
   return res.json({ shipment });
 }));
@@ -321,7 +333,13 @@ app.use((error: unknown, _req: express.Request, res: express.Response, _next: ex
 if (process.env.NODE_ENV !== 'test') {
   const httpServer = createServer(app);
   initializeRealtime(httpServer);
-  connectDatabase().then(() => httpServer.listen(config.port, () => console.log(`JB & Best API listening on port ${config.port}`))).catch((error) => {
+  connectDatabase().then(() => httpServer.listen(config.port, () => {
+    console.log(`JB & Best API listening on port ${config.port}`);
+    void dispatchQueuedShipments().catch((error: unknown) => console.error('Queued dispatch retry failed', error));
+    setInterval(() => {
+      void dispatchQueuedShipments().catch((error: unknown) => console.error('Queued dispatch retry failed', error));
+    }, 15_000);
+  })).catch((error) => {
     console.error('Unable to connect to MongoDB', error);
     process.exit(1);
   });

@@ -5,7 +5,7 @@ import type { RequestHandler } from 'express';
 import { allowRoles, publicUser, type AuthRequest } from '../auth';
 import { calculateQuote } from '../pricing';
 import { ActivityLog, DispatchOffer, MailboxProfile, Notification, PickupJob, RiderProfile, Shipment, User, type DeliveryOption, type MailboxPlan, type MailboxProfileDocument, type Role, type ShipmentDocument, type ShipmentStatus, type UserDocument, type VehicleType } from '../models';
-import { dispatchShipment, eligibleVehiclesForPackage } from '../services/dispatchService';
+import { dispatchQueuedShipments, dispatchShipment, eligibleVehiclesForPackage } from '../services/dispatchService';
 import { emitToShipment, emitToUser } from '../realtime';
 import { ApiError } from './apiError';
 
@@ -22,6 +22,7 @@ interface BookingBody {
   package: { length: number; width: number; height: number; quantity?: number; weight: number; unit?: 'cm' | 'in'; fragile?: boolean; declaredValue?: number };
   deliveryOption: DeliveryOption;
   transport: 'road' | 'air' | 'sea';
+  carrier?: 'fedex' | 'ups' | 'usps' | 'dhl' | 'jb_freight';
   international?: boolean;
   pickupLocation: GeoPoint;
   deliveryLocation: GeoPoint;
@@ -42,8 +43,9 @@ const isGeoPoint = (value: unknown): value is GeoPoint => {
 };
 
 const createTrackingNumber = async () => {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   for (;;) {
-    const trackingNumber = crypto.randomInt(1, 10).toString() + Array.from({ length: 19 }, () => crypto.randomInt(0, 10)).join('');
+    const trackingNumber = Array.from({ length: 20 }, () => alphabet[crypto.randomInt(alphabet.length)]).join('');
     if (!(await Shipment.exists({ trackingId: trackingNumber }))) return trackingNumber;
   }
 };
@@ -62,7 +64,7 @@ export const bookShipment: RequestHandler = async (request, response) => {
 
   if (!body.sender || !body.receiver || !packageDetails || !appointmentWindow) throw new ApiError(400, 'Sender, receiver, package, and appointment window are required');
   if (!isGeoPoint(body.pickupLocation) || !isGeoPoint(body.deliveryLocation)) throw new ApiError(400, 'Pickup and delivery must be GeoJSON Point locations');
-  if (!['standard', 'express', 'same_day', 'premium_overnight'].includes(deliveryOption) || !['road', 'air', 'sea'].includes(transport)) throw new ApiError(400, 'Invalid delivery option or transport');
+  if (!['standard', 'express', 'same_day', 'premium_overnight'].includes(deliveryOption) || !['road', 'air', 'sea'].includes(transport) || (body.carrier && !['fedex', 'ups', 'usps', 'dhl', 'jb_freight'].includes(body.carrier))) throw new ApiError(400, 'Invalid delivery option, transport, or carrier');
 
   const dimensions = [packageDetails.length, packageDetails.width, packageDetails.height, packageDetails.weight].map(Number);
   if (!dimensions.every((value) => Number.isFinite(value) && value > 0)) throw new ApiError(400, 'Package dimensions and weight must be positive numbers');
@@ -110,6 +112,7 @@ export const bookShipment: RequestHandler = async (request, response) => {
         package: { ...packageDetails, ...Object.fromEntries(['length', 'width', 'height', 'weight'].map((key, index) => [key, dimensions[index]])), quantity: Number(packageDetails.quantity || 1), volume: dimensions[0] * dimensions[1] * dimensions[2], vehicleRequired, suggestedPackaging: quote.suggestedPackaging },
         deliveryOption,
         transport,
+        carrier: body.carrier || 'jb_freight',
         status: 'booked',
         total: quote.total,
         currency: quote.currency,
@@ -184,6 +187,9 @@ export const updateRiderLocation: RequestHandler = async (request, response) => 
       updatedAt: new Date().toISOString(),
     });
   }
+  if (profile.is_active) {
+    void dispatchQueuedShipments().catch((error: unknown) => console.error('Queued dispatch retry failed', error));
+  }
   return response.json({ riderProfile: profile });
 };
 
@@ -198,6 +204,9 @@ export const setRiderActiveStatus: RequestHandler = async (request, response) =>
   ).select('userId vehicleType weightCapacityKg is_active is_assigned updatedAt');
   if (!profile) throw new ApiError(404, 'Rider profile not found');
   emitToUser(req.user!._id.toString(), 'rider:status', { is_active: profile.is_active, is_assigned: profile.is_assigned });
+  if (profile.is_active) {
+    void dispatchQueuedShipments().catch((error: unknown) => console.error('Queued dispatch retry failed', error));
+  }
   return response.json({ riderProfile: profile });
 };
 
@@ -298,6 +307,7 @@ export const acceptRiderJob: RequestHandler = async (request, response) => {
   if (!committedShipment) throw new ApiError(404, 'Accepted shipment could not be loaded');
   emitToShipment(committedShipment._id.toString(), 'tracking:status', { trackingNumber: committedShipment.trackingId, status: committedShipment.status, history: committedShipment.tracking_history });
   emitToUser(committedShipment.customerId.toString(), 'shipment:assigned', { trackingNumber: committedShipment.trackingId, status: committedShipment.status });
+  void dispatchQueuedShipments().catch((error: unknown) => console.error('Queued dispatch retry failed', error));
   return response.json({ shipment: committedShipment });
 };
 

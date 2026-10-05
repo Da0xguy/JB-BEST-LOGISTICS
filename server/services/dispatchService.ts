@@ -5,6 +5,7 @@ import { emitToUser } from '../realtime';
 const OFFER_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 1_000;
 const MAX_CANDIDATES = 25;
+let isDispatchQueueRunning = false;
 
 type GeoPoint = { type: 'Point'; coordinates: [number, number] };
 type OfferNotification = (input: { riderId: mongoose.Types.ObjectId; shipmentId: mongoose.Types.ObjectId; offerId: mongoose.Types.ObjectId; trackingId: string; expiresAt: Date }) => Promise<void>;
@@ -59,17 +60,32 @@ export const dispatchShipment = async (shipmentId: string, notify: OfferNotifica
   if (!shipment) throw new Error('Shipment not found');
   if (!shipment.pickupLocation) throw new Error('Shipment has no pickup location');
   if (shipment.assignedRiderId) return { status: 'already_assigned' as const };
+  const now = new Date();
+  const pendingOffer = await DispatchOffer.exists({
+    shipmentId: shipment._id,
+    status: 'offered',
+    expiresAt: { $gt: now },
+  });
+  if (pendingOffer) return { status: 'offer_pending' as const };
 
   const weightKg = Number((shipment.package as { weight?: number }).weight);
   if (!Number.isFinite(weightKg) || weightKg <= 0) throw new Error('Shipment weight is invalid');
   const packageDimensions = shipment.package as { length: number; width: number; height: number; unit?: 'cm' | 'in' };
   const vehicles = eligibleVehiclesForPackage(weightKg, packageDimensions);
   const pickupLocation = shipment.pickupLocation as GeoPoint;
-  const candidates = await RiderProfile.find({
+  const ridersWithPendingOffers = await DispatchOffer.distinct('riderId', {
+    status: 'offered',
+    expiresAt: { $gt: now },
+  });
+  const eligibleRiders = {
     is_active: true,
     is_assigned: false,
+    userId: { $nin: ridersWithPendingOffers },
     vehicleType: { $in: vehicles },
     weightCapacityKg: { $gte: weightKg },
+  };
+  let candidates = await RiderProfile.find({
+    ...eligibleRiders,
     currentLocation: {
       $near: {
         $geometry: pickupLocation,
@@ -77,6 +93,12 @@ export const dispatchShipment = async (shipmentId: string, notify: OfferNotifica
       },
     },
   }).limit(MAX_CANDIDATES).select('userId vehicleType weightCapacityKg').lean();
+  if (!candidates.length) {
+    candidates = await RiderProfile.find({
+      ...eligibleRiders,
+      currentLocation: { $near: { $geometry: pickupLocation } },
+    }).limit(MAX_CANDIDATES).select('userId vehicleType weightCapacityKg').lean();
+  }
 
   for (const candidate of candidates) {
     const activeRider = await User.exists({ _id: candidate.userId, role: 'rider', status: 'active' });
@@ -97,4 +119,27 @@ export const dispatchShipment = async (shipmentId: string, notify: OfferNotifica
   }
 
   return { status: 'no_available_rider' as const };
+};
+
+export const dispatchQueuedShipments = async () => {
+  if (isDispatchQueueRunning) return;
+  isDispatchQueueRunning = true;
+  try {
+    const queued = await Shipment.find({
+      status: 'booked',
+      assignedRiderId: { $exists: false },
+      pickupLocation: { $exists: true },
+    })
+      .sort({ createdAt: 1 })
+      .limit(50)
+      .select('_id')
+      .lean();
+
+    for (const shipment of queued) {
+      const result = await dispatchShipment(shipment._id.toString());
+      if (result.status === 'offer_pending') break;
+    }
+  } finally {
+    isDispatchQueueRunning = false;
+  }
 };

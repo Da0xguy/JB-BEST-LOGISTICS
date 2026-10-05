@@ -39,11 +39,11 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactEmail, setContactEmail] = useState("");
-  const [street, setStreet] = useState("3500 Lenox Rd NE");
-  const [suite, setSuite] = useState("Suite 400");
-  const [city, setCity] = useState("Atlanta");
-  const [state, setState] = useState("GA");
-  const [zip, setZip] = useState("30326");
+  const [street, setStreet] = useState("");
+  const [suite, setSuite] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [zip, setZip] = useState("");
   const [pickupDate, setPickupDate] = useState("2026-09-08");
   const [readyTime, setReadyTime] = useState("13:00");
   const [closeTime, setCloseTime] = useState("17:00");
@@ -155,6 +155,7 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
         },
         deliveryOption: "standard",
         transport: "road",
+        carrier: preferredCarrier,
         pickupLocation: { type: "Point", coordinates: pickupCoordinates },
         deliveryLocation: { type: "Point", coordinates: [-84.3674, 33.8224] },
         appointmentWindow: {
@@ -171,7 +172,7 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
         businessName: businessName || undefined,
         contactName,
         contactPhone,
-        contactEmail: contactEmail || "customer@example.com",
+        contactEmail: contactEmail || "",
         pickupAddress: {
           street,
           suite: suite || undefined,
@@ -186,7 +187,7 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
         preferredCarrier,
         estimatedPackagesCount: Number(packagesCount),
         totalWeightLbs: Number(totalWeight),
-        specialInstructions: instructions || "Front door / porch pickup",
+        specialInstructions: instructions || undefined,
         status: "scheduled",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

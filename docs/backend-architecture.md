@@ -17,7 +17,7 @@ To bootstrap the first admin, set `MONGODB_URI`, `BOOTSTRAP_ADMIN_NAME`, and `BO
 - `POST /api/auth/login` customer, rider, warehouse, and admin login
 - `GET /api/auth/me` current session
 - `POST /api/quotes` shipping quote, packaging suggestion, and cutoff result
-- `POST /api/shipments` create a shipment and 20-digit tracking ID
+- `POST /api/shipments` create a shipment and 20-character alphanumeric tracking ID
 - `GET /api/shipments` role-scoped shipment list
 - `GET /api/appointments` role-scoped appointment history; `POST /api/appointments` persists a customer appointment booking.
 - `GET /api/shipments/track/:trackingId` public tracking lookup
@@ -44,7 +44,7 @@ To bootstrap the first admin, set `MONGODB_URI`, `BOOTSTRAP_ADMIN_NAME`, and `BO
 - `GET /api/v1/warehouse/mailboxes` and `POST /api/v1/warehouse/mailboxes` list and assign persisted mailbox profiles to existing customer accounts.
 - `POST /api/auth/change-password` completes a forced temporary-password change; the new password must be at least 12 characters.
 
-Dispatch searches active, unassigned riders within 10 km using the rider-location `2dsphere` index. Bikes are eligible below 15 kg and up to 60 cm longest side; vans are eligible up to 150 kg and 300 cm; larger parcels require trucks. Rider capacity must meet the package weight. The dispatcher persists one 30-second offer at a time; rider acceptance commits assignment, while rejection or timeout advances to the next candidate. Socket.IO emits `dispatch:offer` to the rider's authenticated user room, and the rider portal also polls for pending offers.
+Dispatch first searches active, unassigned riders within 10 km using the rider-location `2dsphere` index, then falls back to the nearest eligible rider if no local candidate is available. Bikes are eligible below 15 kg and up to 60 cm longest side; vans are eligible up to 150 kg and 300 cm; larger parcels require trucks. Rider capacity must meet the package weight. The dispatcher persists one 30-second offer at a time; rider acceptance commits assignment, while rejection or timeout advances to the next candidate. Queued bookings are retried every 15 seconds and when rider availability or location changes. Socket.IO emits `dispatch:offer` to the rider's authenticated user room, and the rider portal also polls for pending offers.
 
 Staff provisioning may omit `password`; the API generates a unique cryptographically random temporary password per account and returns it once in the creation response. There is no shared default password. The password is stored only as a bcrypt hash. Accounts must change it before using protected APIs or authenticated Socket.IO; generated temporary passwords are not written to logs.
 

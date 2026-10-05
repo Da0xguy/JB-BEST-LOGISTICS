@@ -12,13 +12,14 @@ import { AdminDashboard } from "./components/admin/AdminDashboard";
 import { ArchitectureModal } from "./components/ArchitectureModal";
 import { AuthView } from "./components/AuthView";
 import { CustomerProfileView } from "./components/CustomerProfileView";
-import { getCurrentUser, getCustomerProfile, CustomerProfile } from "./lib/api";
 import {
-  INITIAL_SHIPMENTS,
-  INITIAL_INVOICES,
-  INITIAL_APPOINTMENTS,
-  INITIAL_PICKUPS,
-} from "./data/mockData";
+  getCurrentUser,
+  getCustomerProfile,
+  listCustomerShipments,
+  listOperationalPickups,
+  listWarehouseAppointmentHistory,
+  CustomerProfile,
+} from "./lib/api";
 import {
   Shipment,
   Invoice,
@@ -190,8 +191,17 @@ export default function App() {
       try {
         const { user } = await getCurrentUser();
         if (!isCurrent || user.role !== "customer") return;
-        const { profile, mailboxes } = await getCustomerProfile();
-        if (isCurrent) setCustomerProfile({ ...profile, mailboxes });
+        const [{ profile, mailboxes }, orders, appointmentResult] =
+          await Promise.all([
+            getCustomerProfile(),
+            listCustomerShipments(),
+            listWarehouseAppointmentHistory(),
+          ]);
+        if (!isCurrent) return;
+        setCustomerProfile({ ...profile, mailboxes });
+        setShipments(orders.shipments);
+        setPickups(orders.pickups);
+        setAppointments(appointmentResult.appointments);
       } catch {}
     };
     void loadCustomerProfile();
@@ -240,14 +250,64 @@ export default function App() {
   }, [pathname]);
 
   // Application State
-  const [shipments, setShipments] = useState<Shipment[]>(INITIAL_SHIPMENTS);
-  const [invoices, setInvoices] = useState<Invoice[]>(INITIAL_INVOICES);
-  const [appointments, setAppointments] =
-    useState<Appointment[]>(INITIAL_APPOINTMENTS);
-  const [pickups, setPickups] = useState<PickupRequest[]>(INITIAL_PICKUPS);
-  const [activeTrackingNumber, setActiveTrackingNumber] =
-    useState<string>("JB-8829-US");
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [pickups, setPickups] = useState<PickupRequest[]>([]);
+  const [activeTrackingNumber, setActiveTrackingNumber] = useState<string>("");
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  useEffect(() => {
+    const handleExpiredSession = () => {
+      setCustomerProfile(null);
+      setShipments([]);
+      setPickups([]);
+      setAppointments([]);
+    };
+    window.addEventListener("jb:auth-expired", handleExpiredSession);
+    return () =>
+      window.removeEventListener("jb:auth-expired", handleExpiredSession);
+  }, []);
+
+  useEffect(() => {
+    if (pathname !== "/staff" || portalAccess !== "allowed") return;
+    let isCurrent = true;
+    const refreshPickups = async () => {
+      try {
+        const livePickups = await listOperationalPickups();
+        if (isCurrent) setPickups(livePickups);
+      } catch {}
+    };
+    void refreshPickups();
+    const interval = window.setInterval(() => void refreshPickups(), 15000);
+    return () => {
+      isCurrent = false;
+      window.clearInterval(interval);
+    };
+  }, [pathname, portalAccess]);
+
+  useEffect(() => {
+    if (
+      pathname !== "/" ||
+      !customerProfile ||
+      !localStorage.getItem("jb_best_token")
+    )
+      return;
+    let isCurrent = true;
+    const refreshShipments = async () => {
+      try {
+        const orders = await listCustomerShipments();
+        if (!isCurrent) return;
+        setShipments(orders.shipments);
+        setPickups(orders.pickups);
+      } catch {}
+    };
+    const interval = window.setInterval(() => void refreshShipments(), 15000);
+    return () => {
+      isCurrent = false;
+      window.clearInterval(interval);
+    };
+  }, [pathname, customerProfile?.email]);
 
   const generateQrCodeDataUrl = async (value: string) => {
     try {
@@ -286,6 +346,16 @@ export default function App() {
     const id = Date.now() + Math.random();
     setToasts((current) => [...current, { id, title, message, variant }]);
     window.setTimeout(() => removeToast(id), 4200);
+  };
+
+  const loadCustomerData = async () => {
+    const [orders, appointmentResult] = await Promise.all([
+      listCustomerShipments(),
+      listWarehouseAppointmentHistory(),
+    ]);
+    setShipments(orders.shipments);
+    setPickups(orders.pickups);
+    setAppointments(appointmentResult.appointments);
   };
 
   const showProcessingThenSuccess = (
@@ -388,16 +458,21 @@ export default function App() {
       { ...newPickup, trackingNumber: trackingId, qrCode, qrPayload: payload },
       ...prev,
     ]);
+    try {
+      await loadCustomerData();
+    } catch {
+      showToast(
+        "Order saved",
+        "Your pickup is live, but the order list could not be refreshed.",
+        "error",
+      );
+    }
     showProcessingThenSuccess(
       "Processing pickup",
       `We are scheduling your doorstep collection for ${newPickup.pickupDate}.`,
       "Pickup scheduled",
       `Your pickup for ${newPickup.pickupDate} has been confirmed successfully.`,
     );
-  };
-
-  const handleUpdatePickup = (updated: PickupRequest) => {
-    setPickups((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   };
 
   const handleUpdateAppointment = (updated: Appointment) => {
@@ -487,7 +562,6 @@ export default function App() {
                   appointments={appointments}
                   onAddShipment={handleAddShipment}
                   onUpdateShipment={handleUpdateShipment}
-                  onUpdatePickup={handleUpdatePickup}
                   onUpdateAppointment={handleUpdateAppointment}
                 />
               ) : (
@@ -550,11 +624,12 @@ export default function App() {
             );
             setIsAuthPageOpen(false);
             if (role === "customer") {
-              void getCustomerProfile()
-                .then(({ profile, mailboxes }) =>
+              void Promise.all([
+                getCustomerProfile().then(({ profile, mailboxes }) =>
                   setCustomerProfile({ ...profile, mailboxes }),
-                )
-                .catch(() => {});
+                ),
+                loadCustomerData(),
+              ]).catch(() => {});
             }
           }}
         />
@@ -579,7 +654,6 @@ export default function App() {
               appointments={appointments}
               onAddShipment={handleAddShipment}
               onUpdateShipment={handleUpdateShipment}
-              onUpdatePickup={handleUpdatePickup}
               onUpdateAppointment={handleUpdateAppointment}
             />
           )}
@@ -641,8 +715,17 @@ export default function App() {
                           <input
                             type="text"
                             value={heroSearch}
-                            onChange={(e) => setHeroSearch(e.target.value)}
-                            placeholder="Enter tracking number (e.g. JB-8829-US)..."
+                            maxLength={20}
+                            autoCapitalize="characters"
+                            onChange={(e) =>
+                              setHeroSearch(
+                                e.target.value
+                                  .replace(/[^a-z0-9]/gi, "")
+                                  .slice(0, 20)
+                                  .toUpperCase(),
+                              )
+                            }
+                            placeholder="Enter 20-character tracking ID..."
                             className="w-full rounded-2xl border border-white/70 bg-white py-4 pl-12 pr-4 text-sm font-medium text-gray-900 shadow-xl outline-none transition placeholder:text-gray-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 sm:text-base"
                           />
                         </div>
@@ -654,34 +737,6 @@ export default function App() {
                           <ArrowRight className="w-4 h-4" />
                         </button>
                       </form>
-
-                      {/* Quick Demo Pill buttons */}
-                      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-300">
-                        <span className="font-medium text-slate-200">
-                          Sample tracking:
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleQuickTrack("JB-8829-US")}
-                          className="px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-blue-700 font-medium border border-gray-200 transition cursor-pointer"
-                        >
-                          JB-8829-US (FedEx)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleQuickTrack("JB-9102-US")}
-                          className="px-2.5 py-1 rounded-full bg-white hover:bg-amber-50 text-amber-800 font-medium border border-gray-200 transition cursor-pointer"
-                        >
-                          JB-9102-US (UPS)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleQuickTrack("JB-4421-US")}
-                          className="px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-blue-800 font-medium border border-gray-200 transition cursor-pointer"
-                        >
-                          JB-4421-US (USPS)
-                        </button>
-                      </div>
 
                       <div className="mt-6 grid max-w-2xl grid-cols-3 border-y border-white/20 py-3 text-white">
                         <div className="border-r border-white/20 pr-3 sm:pr-6">
@@ -742,7 +797,6 @@ export default function App() {
                   <TrackingView
                     shipments={shipments}
                     initialTrackingId={activeTrackingNumber}
-                    onUpdateShipment={handleUpdateShipment}
                   />
                 )}
 

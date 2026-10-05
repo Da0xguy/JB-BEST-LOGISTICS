@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { LocateFixed, UserRound } from "lucide-react";
 import {
   CustomerProfile,
+  getCurrentUser,
   getCustomerProfile,
   saveCustomerProfile,
 } from "../lib/api";
@@ -26,7 +27,22 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
 
   useEffect(() => {
     let isCurrent = true;
-    getCustomerProfile()
+    if (!localStorage.getItem("jb_best_token")) {
+      setIsLoading(false);
+      return () => {
+        isCurrent = false;
+      };
+    }
+    getCurrentUser()
+      .then(({ user }) => {
+        if (user.role !== "customer") {
+          localStorage.removeItem("jb_best_token");
+          throw new Error(
+            "Sign in with a customer account to view this profile.",
+          );
+        }
+        return getCustomerProfile();
+      })
       .then(({ profile: savedProfile, mailboxes }) => {
         if (!isCurrent) return;
         const fullProfile = { ...savedProfile, mailboxes };

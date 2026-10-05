@@ -1,4 +1,4 @@
-import type { Appointment } from '../types';
+import type { Appointment, Carrier, PickupRequest, Shipment, ShipmentStatus } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
@@ -73,6 +73,28 @@ export interface WarehouseShipmentHistory {
   assignedRiderId?: { name: string; email: string; phone?: string } | string | null;
 }
 
+interface StoredShipment {
+  _id: string;
+  trackingId: string;
+  customerId: string;
+  sender: Record<string, any>;
+  receiver: Record<string, any>;
+  package: Record<string, any>;
+  carrier?: Carrier;
+  deliveryOption: string;
+  transport: string;
+  status: string;
+  pickupLocation?: { coordinates: [number, number] };
+  deliveryLocation?: { coordinates: [number, number] };
+  appointmentWindow?: { start: string; end: string; slot?: string };
+  tracking_history?: Array<Record<string, any>>;
+  events?: Array<Record<string, any>>;
+  assignedRiderId?: { name?: string; email?: string; phone?: string } | string | null;
+  createdAt: string;
+  updatedAt: string;
+  deliveredAt?: string;
+}
+
 type ApiOptions = RequestInit & { auth?: boolean };
 
 export class ApiError extends Error {
@@ -91,6 +113,10 @@ export const apiRequest = async <T>(path: string, options: ApiOptions = {}): Pro
   }
   const response = await fetch(`${API_URL}${path}`, { ...options, headers });
   const body = await response.json().catch(() => ({}));
+  if (response.status === 401 && options.auth !== false) {
+    localStorage.removeItem('jb_best_token');
+    window.dispatchEvent(new Event('jb:auth-expired'));
+  }
   if (!response.ok) throw new ApiError(body.error || 'Request failed', response.status, body.code);
   return body as T;
 };
@@ -184,14 +210,182 @@ export const bookPickupShipment = (booking: {
   };
   deliveryOption: 'standard';
   transport: 'road';
+  carrier: Carrier;
   pickupLocation: { type: 'Point'; coordinates: [number, number] };
   deliveryLocation: { type: 'Point'; coordinates: [number, number] };
   appointmentWindow: { start: string; end: string; slot: string };
 }) =>
-  apiRequest<{ trackingNumber: string; shipment: { customerId: string } }>('/api/v1/shipments/book', {
+  apiRequest<{ trackingNumber: string; shipment: StoredShipment }>('/api/v1/shipments/book', {
     method: 'POST',
     body: JSON.stringify(booking),
   });
+
+const shipmentStatus = (status: string): ShipmentStatus => {
+  switch (status) {
+    case 'picked_up':
+      return 'picked_up';
+    case 'at_warehouse':
+    case 'in_transit':
+      return 'in_transit';
+    case 'out_for_delivery':
+      return 'out_for_delivery';
+    case 'delivered':
+      return 'delivered';
+    case 'exception':
+    case 'cancelled':
+      return 'exception';
+    default:
+      return 'order_created';
+  }
+};
+
+const shipmentAddress = (address: Record<string, any>) => ({
+  name: String(address.name || 'Unknown'),
+  company: address.company ? String(address.company) : undefined,
+  street: String(address.street || ''),
+  suite: address.suite ? String(address.suite) : undefined,
+  city: String(address.city || 'Location unavailable'),
+  state: String(address.state || ''),
+  zip: String(address.postalCode || ''),
+  country: String(address.country || ''),
+  phone: String(address.phone || ''),
+  email: address.email ? String(address.email) : undefined,
+});
+
+export const toCustomerShipment = (stored: StoredShipment): Shipment => {
+  const sender = shipmentAddress(stored.sender);
+  const recipient = shipmentAddress(stored.receiver);
+  const status = shipmentStatus(stored.status);
+  const pickupCoordinates = stored.pickupLocation?.coordinates;
+  const deliveryCoordinates = stored.deliveryLocation?.coordinates;
+  const location = (
+    address: ReturnType<typeof shipmentAddress>,
+    coordinates?: [number, number],
+    facilityName?: string,
+  ) => ({
+    city: address.city,
+    state: address.state,
+    country: address.country,
+    latitude: coordinates?.[1] ?? 0,
+    longitude: coordinates?.[0] ?? 0,
+    facilityName,
+  });
+  const originLocation = location(sender, pickupCoordinates, 'Pickup location');
+  const destinationLocation = location(recipient, deliveryCoordinates, 'Delivery location');
+  const rawLogs = stored.tracking_history?.length ? stored.tracking_history : stored.events || [];
+  const trackingLogs = rawLogs.map((event, index) => ({
+    id: String(event._id || `${stored.trackingId}-${index}`),
+    shipmentId: stored._id,
+    status: shipmentStatus(String(event.status || stored.status)),
+    title: String(event.note || String(event.status || stored.status).replaceAll('_', ' ')),
+    description: String(event.note || ''),
+    location: status === 'delivered' ? destinationLocation : originLocation,
+    timestamp: new Date(String(event.createdAt || stored.createdAt)).toISOString(),
+  }));
+  const packageDetails = stored.package;
+  const appointment = stored.appointmentWindow;
+
+  return {
+    id: stored._id,
+    trackingNumber: stored.trackingId,
+    carrier: stored.carrier || 'jb_freight',
+    serviceLevel: `${stored.deliveryOption.replaceAll('_', ' ')} ${stored.transport}`,
+    sender,
+    recipient,
+    packageDetails: {
+      weightLbs: Number(packageDetails.weight || 0) * 2.20462,
+      dimensions: {
+        length: Number(packageDetails.length || 0),
+        width: Number(packageDetails.width || 0),
+        height: Number(packageDetails.height || 0),
+        unit: packageDetails.unit === 'cm' ? 'cm' : 'in',
+      },
+      packageType: packageDetails.suggestedPackaging || 'box',
+      isFragile: Boolean(packageDetails.fragile),
+      requiresSignature: false,
+      declaredValue: Number(packageDetails.declaredValue || 0),
+    },
+    currentStatus: status,
+    currentLocation: status === 'delivered' ? destinationLocation : originLocation,
+    originLocation,
+    destinationLocation,
+    estimatedDelivery: appointment
+      ? `${new Date(appointment.start).toLocaleDateString()} ${appointment.slot || ''}`.trim()
+      : 'Not scheduled',
+    actualDelivery: stored.deliveredAt,
+    trackingLogs,
+    customerId: stored.customerId,
+    createdAt: stored.createdAt,
+    updatedAt: stored.updatedAt,
+  };
+};
+
+const toPickupRequest = (stored: StoredShipment): PickupRequest => {
+  const start = stored.appointmentWindow?.start ? new Date(stored.appointmentWindow.start) : new Date(stored.createdAt);
+  const [readyTime = '09:00', closeTime = '17:00'] = (stored.appointmentWindow?.slot || '').split(' - ');
+  const packageDetails = stored.package;
+  const address = shipmentAddress(stored.sender);
+  const status: PickupRequest['status'] = stored.status === 'delivered'
+    ? 'completed'
+    : stored.status === 'cancelled'
+      ? 'cancelled'
+      : ['picked_up', 'at_warehouse', 'in_transit', 'out_for_delivery'].includes(stored.status)
+        ? 'in_route'
+        : stored.status === 'assigned'
+          ? 'assigned'
+          : 'scheduled';
+  return {
+    id: stored._id,
+    trackingNumber: stored.trackingId,
+    customerId: stored.customerId,
+    contactName: address.name,
+    contactPhone: address.phone,
+    contactEmail: address.email || '',
+    pickupAddress: {
+      street: address.street,
+      suite: address.suite,
+      city: address.city,
+      state: address.state,
+      zip: address.zip,
+      country: address.country,
+    },
+    pickupDate: start.toISOString().slice(0, 10),
+    readyTime,
+    closeTime,
+    preferredCarrier: stored.carrier || 'jb_freight',
+    estimatedPackagesCount: Number(packageDetails.quantity || 1),
+    totalWeightLbs: Number(packageDetails.weight || 0) * 2.20462,
+    assignedDriverId: typeof stored.assignedRiderId === 'object' && stored.assignedRiderId
+      ? stored.assignedRiderId.name || stored.assignedRiderId.email || stored.assignedRiderId.phone
+      : typeof stored.assignedRiderId === 'string'
+        ? stored.assignedRiderId
+        : undefined,
+    status,
+    createdAt: stored.createdAt,
+    updatedAt: stored.updatedAt,
+  };
+};
+
+export const listCustomerShipments = async () => {
+  const { shipments } = await apiRequest<{ shipments: StoredShipment[] }>('/api/shipments');
+  return {
+    shipments: shipments.map(toCustomerShipment),
+    pickups: shipments.map(toPickupRequest),
+  };
+};
+
+export const listOperationalPickups = async () => {
+  const { shipments } = await apiRequest<{ shipments: StoredShipment[] }>('/api/shipments');
+  return shipments.map(toPickupRequest);
+};
+
+export const getShipmentByTrackingNumber = async (trackingNumber: string) => {
+  const { shipment } = await apiRequest<{ shipment: StoredShipment }>(
+    `/api/shipments/track/${encodeURIComponent(trackingNumber)}`,
+    { auth: false },
+  );
+  return toCustomerShipment(shipment);
+};
 
 export const getRiderProfile = () =>
   apiRequest<{ riderProfile: { is_active: boolean; is_assigned: boolean } }>('/api/v1/riders/profile');

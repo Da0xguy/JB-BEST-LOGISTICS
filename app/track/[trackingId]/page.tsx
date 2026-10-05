@@ -1,598 +1,378 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState, useRef } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { Shipment, TrackingLog, ShipmentStatus } from '@/types';
+import React, { useEffect, useState } from "react";
+import { Shipment, ShipmentStatus } from "@/types";
 import {
-  Package,
-  Truck,
+  AlertCircle,
+  ArrowRight,
   CheckCircle2,
   Clock,
   MapPin,
-  AlertCircle,
-  ArrowRight,
-  ShieldCheck,
-  Building2,
-  Calendar,
-  Layers,
-  Radio,
-  ExternalLink,
-} from 'lucide-react';
+  Package,
+} from "lucide-react";
 
 interface PageProps {
   params: { trackingId: string } | Promise<{ trackingId: string }>;
 }
 
-// Demo fallback data representing a live shipment for JB & Best Logistics LLC
-const DEMO_SHIPMENT: Shipment = {
-  id: 'JB-8829-US',
-  trackingNumber: 'JB-8829-US',
-  carrier: 'fedex',
-  serviceLevel: 'FedEx Priority Overnight',
-  sender: {
-    name: 'JB & Best Logistics Hub',
-    company: 'JB & Best Logistics LLC',
-    street: '2450 Piedmont Rd NE, Suite 100',
-    city: 'Atlanta',
-    state: 'GA',
-    zip: '30324',
-    country: 'USA',
-    phone: '+1 (404) 555-0199',
-    email: 'dispatch@jbbestlogistics.com',
-  },
-  recipient: {
-    name: 'Sarah Jenkins',
-    company: 'Peachtree Creative Studio',
-    street: '1200 Savannah Hwy',
-    city: 'Augusta',
-    state: 'GA',
-    zip: '30901',
-    country: 'USA',
-    phone: '+1 (706) 555-4821',
-  },
-  packageDetails: {
-    weightLbs: 4.8,
-    dimensions: { length: 14, width: 10, height: 4, unit: 'in' },
-    packageType: 'box',
-    isFragile: true,
-    requiresSignature: true,
-    declaredValue: 450,
-  },
-  currentStatus: 'out_for_delivery',
-  currentLocation: {
-    city: 'Augusta',
-    state: 'GA',
-    country: 'USA',
-    latitude: 33.4735,
-    longitude: -81.968,
-    facilityName: 'Augusta Local Metro Delivery Depot',
-  },
-  originLocation: {
-    city: 'Atlanta',
-    state: 'GA',
-    country: 'USA',
-    latitude: 33.749,
-    longitude: -84.388,
-    facilityName: 'JB & Best Logistics Retail Hub',
-  },
-  destinationLocation: {
-    city: 'Augusta',
-    state: 'GA',
-    country: 'USA',
-    latitude: 33.4735,
-    longitude: -81.968,
-    facilityName: 'Client Destination',
-  },
-  estimatedDelivery: 'Today by 4:30 PM',
-  createdAt: '2026-09-06T08:30:00Z',
-  updatedAt: '2026-09-07T10:15:00Z',
-  trackingLogs: [
-    {
-      id: 'log-1',
-      shipmentId: 'JB-8829-US',
-      status: 'order_created',
-      title: 'Shipping Label Created & Verified',
-      description: 'Shipment registered at JB & Best Logistics retail terminal.',
-      location: {
-        city: 'Atlanta',
-        state: 'GA',
-        country: 'USA',
-        latitude: 33.749,
-        longitude: -84.388,
-        facilityName: 'JB & Best Logistics Hub - Piedmont Rd',
-      },
-      timestamp: '2026-09-06T09:12:00Z',
-    },
-    {
-      id: 'log-2',
-      shipmentId: 'JB-8829-US',
-      status: 'picked_up',
-      title: 'Package Processed & Weighed',
-      description: 'Carrier sorting hub scan completed. Manifest sealed.',
-      location: {
-        city: 'Atlanta',
-        state: 'GA',
-        country: 'USA',
-        latitude: 33.749,
-        longitude: -84.388,
-        facilityName: 'Regional Carrier Hub (FedEx Express)',
-      },
-      timestamp: '2026-09-06T15:40:00Z',
-    },
-    {
-      id: 'log-3',
-      shipmentId: 'JB-8829-US',
-      status: 'in_transit',
-      title: 'In Transit via I-20 Corridor',
-      description: 'Linehaul vehicle departed Atlanta transit facility towards Augusta.',
-      location: {
-        city: 'Greensboro',
-        state: 'GA',
-        country: 'USA',
-        latitude: 33.5757,
-        longitude: -83.1824,
-        facilityName: 'Mid-Georgia Highway Waypoint',
-      },
-      timestamp: '2026-09-06T23:10:00Z',
-    },
-    {
-      id: 'log-4',
-      shipmentId: 'JB-8829-US',
-      status: 'out_for_delivery',
-      title: 'Out for Delivery',
-      description: 'Loaded on local delivery courier vehicle. Driver in transit.',
-      location: {
-        city: 'Augusta',
-        state: 'GA',
-        country: 'USA',
-        latitude: 33.4735,
-        longitude: -81.968,
-        facilityName: 'Augusta Metro Distribution Hub',
-      },
-      timestamp: '2026-09-07T08:45:00Z',
-    },
-  ],
-};
-
-const MILESTONES: { status: ShipmentStatus; label: string; description: string }[] = [
-  { status: 'order_created', label: 'Order Created', description: 'Label generated' },
-  { status: 'picked_up', label: 'Picked Up', description: 'Origin scan' },
-  { status: 'in_transit', label: 'In Transit', description: 'Moving to destination' },
-  { status: 'out_for_delivery', label: 'Out for Delivery', description: 'With courier' },
-  { status: 'delivered', label: 'Delivered', description: 'Signed and delivered' },
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const MILESTONES: { status: ShipmentStatus; label: string }[] = [
+  { status: "order_created", label: "Order created" },
+  { status: "picked_up", label: "Picked up" },
+  { status: "in_transit", label: "In transit" },
+  { status: "out_for_delivery", label: "Out for delivery" },
+  { status: "delivered", label: "Delivered" },
 ];
 
-export default function TrackingPage({ params }: PageProps) {
-  const [resolvedTrackingId, setResolvedTrackingId] = useState<string>('');
-  const [shipment, setShipment] = useState<Shipment | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [isLiveListening, setIsLiveListening] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
+const mapStatus = (status: string): ShipmentStatus => {
+  if (status === "picked_up") return "picked_up";
+  if (status === "at_warehouse" || status === "in_transit") return "in_transit";
+  if (status === "out_for_delivery") return "out_for_delivery";
+  if (status === "delivered") return "delivered";
+  if (status === "exception" || status === "cancelled") return "exception";
+  return "order_created";
+};
 
-  // Unwrap params safely for Next.js App Router (supports both direct and async params)
+const mapShipment = (record: Record<string, any>): Shipment => {
+  const mapAddress = (value: Record<string, any>) => ({
+    name: String(value.name || "Unknown"),
+    company: value.company ? String(value.company) : undefined,
+    street: String(value.street || ""),
+    suite: value.suite ? String(value.suite) : undefined,
+    city: String(value.city || "Location unavailable"),
+    state: String(value.state || ""),
+    zip: String(value.postalCode || ""),
+    country: String(value.country || ""),
+    phone: String(value.phone || ""),
+    email: value.email ? String(value.email) : undefined,
+  });
+  const sender = mapAddress(record.sender || {});
+  const recipient = mapAddress(record.receiver || {});
+  const pickup = record.pickupLocation?.coordinates as
+    | [number, number]
+    | undefined;
+  const delivery = record.deliveryLocation?.coordinates as
+    | [number, number]
+    | undefined;
+  const mapLocation = (address: typeof sender, point?: [number, number]) => ({
+    city: address.city,
+    state: address.state,
+    country: address.country,
+    latitude: point?.[1] || 0,
+    longitude: point?.[0] || 0,
+  });
+  const originLocation = mapLocation(sender, pickup);
+  const destinationLocation = mapLocation(recipient, delivery);
+  const currentStatus = mapStatus(String(record.status || "booked"));
+  const history = record.tracking_history?.length
+    ? record.tracking_history
+    : record.events || [];
+  const trackingLogs = history.map(
+    (event: Record<string, any>, index: number) => ({
+      id: String(event._id || `${record.trackingId}-${index}`),
+      shipmentId: String(record._id),
+      status: mapStatus(String(event.status || record.status)),
+      title: String(
+        event.note ||
+          String(event.status || record.status).replaceAll("_", " "),
+      ),
+      description: String(event.note || ""),
+      location:
+        currentStatus === "delivered" ? destinationLocation : originLocation,
+      timestamp: String(event.createdAt || record.createdAt),
+    }),
+  );
+  const packageDetails = record.package || {};
+  const appointment = record.appointmentWindow;
+
+  return {
+    id: String(record._id),
+    trackingNumber: String(record.trackingId),
+    carrier: record.carrier || "jb_freight",
+    serviceLevel:
+      `${String(record.deliveryOption || "standard").replaceAll("_", " ")} ${record.transport || ""}`.trim(),
+    sender,
+    recipient,
+    packageDetails: {
+      weightLbs: Number(packageDetails.weight || 0) * 2.20462,
+      dimensions: {
+        length: Number(packageDetails.length || 0),
+        width: Number(packageDetails.width || 0),
+        height: Number(packageDetails.height || 0),
+        unit: packageDetails.unit === "cm" ? "cm" : "in",
+      },
+      packageType: packageDetails.suggestedPackaging || "box",
+      isFragile: Boolean(packageDetails.fragile),
+      requiresSignature: false,
+      declaredValue: Number(packageDetails.declaredValue || 0),
+    },
+    currentStatus,
+    currentLocation:
+      currentStatus === "delivered" ? destinationLocation : originLocation,
+    originLocation,
+    destinationLocation,
+    estimatedDelivery: appointment
+      ? new Date(appointment.start).toLocaleString()
+      : "Not scheduled",
+    actualDelivery: record.deliveredAt,
+    trackingLogs,
+    createdAt: String(record.createdAt),
+    updatedAt: String(record.updatedAt),
+  };
+};
+
+export default function TrackingPage({ params }: PageProps) {
+  const [trackingId, setTrackingId] = useState("");
+  const [shipment, setShipment] = useState<Shipment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [isLive, setIsLive] = useState(false);
+
   useEffect(() => {
-    Promise.resolve(params).then((resolved) => {
-      setResolvedTrackingId(resolved.trackingId);
+    let active = true;
+    Promise.resolve(params).then(({ trackingId: resolved }) => {
+      if (active) setTrackingId(resolved);
     });
+    return () => {
+      active = false;
+    };
   }, [params]);
 
-  // Firestore onSnapshot real-time listener
   useEffect(() => {
-    if (!resolvedTrackingId) return;
+    if (!trackingId) return;
+    let active = true;
+    let hasLoaded = false;
+    const refresh = async () => {
+      try {
+        const response = await fetch(
+          `${API_URL}/api/shipments/track/${encodeURIComponent(trackingId)}`,
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok)
+          throw new Error(result.error || "Tracking ID not found");
+        if (!active) return;
+        setShipment(mapShipment(result.shipment));
+        setError("");
+        setIsLive(true);
+      } catch (loadError) {
+        if (!active) return;
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Tracking service unavailable",
+        );
+        setIsLive(false);
+      } finally {
+        if (active) setLoading(false);
+        hasLoaded = true;
+      }
+    };
 
-    setLoading(true);
-    setError(null);
+    if (!hasLoaded) setLoading(true);
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 15000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [trackingId]);
 
-    try {
-      const docRef = doc(db, 'shipments', resolvedTrackingId);
-      const unsubscribe = onSnapshot(
-        docRef,
-        (snapshot) => {
-          if (snapshot.exists()) {
-            const data = snapshot.data() as Shipment;
-            setShipment({
-              ...data,
-              id: snapshot.id,
-            });
-            setIsLiveListening(true);
-            setLoading(false);
-          } else {
-            // If document does not exist in live Firestore, provide DEMO fallback data
-            console.warn(`Shipment ${resolvedTrackingId} not found in Firestore. Loading showcase data.`);
-            setShipment({
-              ...DEMO_SHIPMENT,
-              id: resolvedTrackingId,
-              trackingNumber: resolvedTrackingId,
-            });
-            setIsLiveListening(false);
-            setLoading(false);
-          }
-        },
-        (err) => {
-          console.error('Firestore onSnapshot listener error:', err);
-          // Graceful fallback to interactive preview
-          setShipment({
-            ...DEMO_SHIPMENT,
-            id: resolvedTrackingId,
-            trackingNumber: resolvedTrackingId,
-          });
-          setIsLiveListening(false);
-          setLoading(false);
-        }
-      );
-
-      return () => unsubscribe();
-    } catch (err: any) {
-      console.error('Failed to establish Firestore listener:', err);
-      setShipment(DEMO_SHIPMENT);
-      setLoading(false);
-    }
-  }, [resolvedTrackingId]);
-
-  // Mapbox GL initialization or interactive SVG map pin fallback
-  useEffect(() => {
-    if (!shipment || !mapContainerRef.current) return;
-
-    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-    if (token) {
-      import('mapbox-gl').then(({ default: mapboxgl }) => {
-        if (!mapContainerRef.current) return;
-        (mapboxgl as any).accessToken = token;
-
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.remove();
-        }
-
-        const map = new mapboxgl.Map({
-          container: mapContainerRef.current,
-          style: 'mapbox://styles/mapbox/streets-v12',
-          center: [shipment.currentLocation.longitude, shipment.currentLocation.latitude],
-          zoom: 11,
-        });
-
-        // Add Marker for current GPS location
-        new mapboxgl.Marker({ color: '#2563EB' })
-          .setLngLat([shipment.currentLocation.longitude, shipment.currentLocation.latitude])
-          .setPopup(
-            new mapboxgl.Popup({ offset: 25 }).setHTML(
-              `<div style="font-family: sans-serif; padding: 4px;">
-                <h4 style="margin: 0 0 4px 0; font-size: 14px; font-weight: bold;">${shipment.trackingNumber}</h4>
-                <p style="margin: 0; font-size: 12px; color: #4b5563;">Status: ${shipment.currentStatus.toUpperCase()}</p>
-                <p style="margin: 4px 0 0 0; font-size: 11px; color: #6b7280;">${shipment.currentLocation.city}, ${shipment.currentLocation.state}</p>
-              </div>`
-            )
-          )
-          .addTo(map);
-
-        mapInstanceRef.current = map;
-      }).catch((e) => {
-        console.warn('Mapbox GL dynamic import fallback:', e);
-      });
-    }
-  }, [shipment]);
-
-  const getCarrierColor = (carrier: string) => {
-    switch (carrier) {
-      case 'fedex':
-        return 'bg-purple-600 text-white border-purple-700';
-      case 'ups':
-        return 'bg-amber-800 text-amber-50 border-amber-900';
-      case 'usps':
-        return 'bg-blue-700 text-white border-blue-800';
-      default:
-        return 'bg-emerald-700 text-white border-emerald-800';
-    }
-  };
-
-  const getStatusIndex = (status: ShipmentStatus) => {
-    const order: ShipmentStatus[] = ['order_created', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered'];
-    return order.indexOf(status);
-  };
-
-  const currentIndex = shipment ? getStatusIndex(shipment.currentStatus) : -1;
-
-  if (loading) {
+  if (loading && !shipment) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-slate-600 font-medium">Connecting to JB & Best Logistics real-time telemetry...</p>
-        </div>
-      </div>
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-600">
+        Loading shipment status...
+      </main>
     );
   }
 
   if (!shipment) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="max-w-md bg-white p-8 rounded-xl border border-slate-200 shadow-sm text-center">
-          <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-slate-900">Shipment Not Found</h2>
-          <p className="text-slate-600 mt-2">
-            No package records matching tracking ID &quot;{resolvedTrackingId}&quot;.
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <section className="max-w-md border border-slate-200 bg-white p-8 text-center">
+          <AlertCircle className="mx-auto h-10 w-10 text-rose-600" />
+          <h1 className="mt-4 text-xl font-bold text-slate-900">
+            Shipment not found
+          </h1>
+          <p className="mt-2 text-sm text-slate-600">
+            {error || "No shipment matches this tracking ID."}
           </p>
-        </div>
-      </div>
+        </section>
+      </main>
     );
   }
 
+  const currentIndex = Math.max(
+    0,
+    MILESTONES.findIndex(({ status }) => status === shipment.currentStatus),
+  );
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 pb-16">
-      {/* Top Banner */}
-      <div className="bg-slate-900 text-white border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center font-black text-white text-lg">
-              JB
-            </div>
-            <div>
-              <h1 className="font-bold text-lg leading-none">JB & Best Logistics LLC</h1>
-              <p className="text-xs text-slate-400 mt-1">Multi-Carrier Shipping & Retail Hub • Georgia, USA</p>
-            </div>
+    <main className="min-h-screen bg-slate-50 pb-12 text-slate-900">
+      <header className="border-b border-slate-800 bg-slate-900 text-white">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
+          <div>
+            <p className="text-sm font-bold">JB &amp; Best Logistics</p>
+            <h1 className="mt-1 text-xs text-slate-300">Shipment tracking</h1>
           </div>
-
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700 text-xs">
-              <span className={`w-2 h-2 rounded-full ${isLiveListening ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-              <span className="text-slate-300">
-                {isLiveListening ? 'Firestore Real-Time Live' : 'Active Telemetry Simulation'}
-              </span>
-            </div>
-          </div>
+          <span className="inline-flex items-center gap-2 text-xs text-slate-300">
+            <span
+              className={`h-2 w-2 rounded-full ${isLive ? "bg-emerald-400" : "bg-amber-400"}`}
+            />
+            {isLive
+              ? "Live API • refreshes every 15 seconds"
+              : "Tracking service unavailable"}
+          </span>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        {/* Main Status Header Card */}
-        <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100">
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
+        {error && (
+          <p
+            role="alert"
+            className="border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+          >
+            {error}
+          </p>
+        )}
+        <section className="border border-slate-200 bg-white p-6 sm:p-8">
+          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
             <div>
-              <div className="flex items-center space-x-3 mb-2">
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${getCarrierColor(shipment.carrier)}`}>
-                  {shipment.carrier.toUpperCase()}
-                </span>
-                <span className="text-sm font-medium text-slate-500">{shipment.serviceLevel}</span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                Tracking ID: {shipment.trackingNumber}
+              <p className="text-xs font-semibold uppercase text-slate-500">
+                Tracking ID
+              </p>
+              <h2 className="mt-1 break-all font-mono text-2xl font-bold">
+                {shipment.trackingNumber}
               </h2>
-              <p className="text-sm text-slate-500 mt-1 flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-slate-400" />
-                Current Facility: <strong className="text-slate-700">{shipment.currentLocation.facilityName || shipment.currentLocation.city}</strong>
+              <p className="mt-2 text-sm text-slate-600">
+                {shipment.serviceLevel}
               </p>
             </div>
-
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 sm:min-w-[280px]">
-              <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Estimated Delivery</p>
-              <p className="text-xl sm:text-2xl font-black text-blue-950 mt-1">{shipment.estimatedDelivery}</p>
-              <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />
-                Status: <span className="font-semibold capitalize">{shipment.currentStatus.replace(/_/g, ' ')}</span>
+            <div className="sm:text-right">
+              <p className="text-xs font-semibold uppercase text-slate-500">
+                Pickup window
+              </p>
+              <p className="mt-1 font-semibold">{shipment.estimatedDelivery}</p>
+              <p className="mt-1 inline-flex items-center gap-1 text-sm capitalize text-blue-800">
+                <Clock className="h-4 w-4" />
+                {shipment.currentStatus.replaceAll("_", " ")}
               </p>
             </div>
           </div>
 
-          {/* Stepper Progress Bar */}
-          <div className="pt-8">
-            <div className="grid grid-cols-5 gap-2 relative">
-              {/* Connector line */}
-              <div className="absolute top-5 left-[10%] right-[10%] h-1 bg-slate-200 -z-0" />
-              <div
-                className="absolute top-5 left-[10%] h-1 bg-blue-600 -z-0 transition-all duration-500"
-                style={{
-                  width: `${Math.max(0, Math.min(100, (currentIndex / (MILESTONES.length - 1)) * 80))}%`,
-                }}
-              />
-
-              {MILESTONES.map((milestone, idx) => {
-                const isPassed = idx <= currentIndex;
-                const isCurrent = idx === currentIndex;
-
-                return (
-                  <div key={milestone.status} className="flex flex-col items-center text-center relative z-10">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${
-                        isCurrent
-                          ? 'bg-blue-600 text-white ring-4 ring-blue-100 scale-110'
-                          : isPassed
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white border-2 border-slate-300 text-slate-400'
-                      }`}
-                    >
-                      {isPassed ? <CheckCircle2 className="w-5 h-5" /> : idx + 1}
-                    </div>
-                    <p className={`text-xs sm:text-sm font-semibold mt-3 ${isPassed ? 'text-slate-900' : 'text-slate-400'}`}>
-                      {milestone.label}
-                    </p>
-                    <p className="hidden sm:block text-[11px] text-slate-500 mt-0.5 max-w-[120px]">
-                      {milestone.description}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="mt-8 grid grid-cols-5 gap-2">
+            {MILESTONES.map((milestone, index) => (
+              <div key={milestone.status} className="text-center">
+                <div
+                  className={`mx-auto flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold ${index <= currentIndex ? "bg-blue-700 text-white" : "border border-slate-300 bg-white text-slate-400"}`}
+                >
+                  {index < currentIndex ? (
+                    <CheckCircle2 className="h-5 w-5" />
+                  ) : (
+                    index + 1
+                  )}
+                </div>
+                <p className="mt-2 text-[11px] font-semibold sm:text-xs">
+                  {milestone.label}
+                </p>
+              </div>
+            ))}
           </div>
-        </div>
+        </section>
 
-        {/* Two Column Grid: Mapbox Map + Telemetry Feed */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Left: Interactive Mapbox / GPS Visualizer (7 cols) */}
-          <div className="lg:col-span-7 space-y-6">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
-                  <span className="text-sm font-semibold">Live GPS Telemetry (Mapbox Engine)</span>
-                </div>
-                <span className="text-xs text-slate-400 font-mono">
-                  {shipment.currentLocation.latitude.toFixed(4)}°N, {shipment.currentLocation.longitude.toFixed(4)}°W
-                </span>
-              </div>
-
-              {/* Mapbox container with styled overlay */}
-              <div className="relative w-full h-[420px] bg-slate-100 overflow-hidden">
-                {/* Fallback & interactive GPS Canvas */}
-                <div ref={mapContainerRef} className="absolute inset-0 w-full h-full">
-                  {/* High quality stylized map representation if token isn't configured */}
-                  <div className="w-full h-full bg-[#e5e9ec] relative flex flex-col justify-between p-6">
-                    {/* Grid lines and geographic route representation */}
-                    <svg className="absolute inset-0 w-full h-full opacity-60 pointer-events-none" xmlns="http://www.w3.org/2000/svg">
-                      <defs>
-                        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#cbd5e1" strokeWidth="0.75" />
-                        </pattern>
-                      </defs>
-                      <rect width="100%" height="100%" fill="url(#grid)" />
-                      {/* Transit Line between Atlanta and Augusta */}
-                      <path
-                        d="M 120 280 Q 260 210, 480 180"
-                        fill="none"
-                        stroke="#2563eb"
-                        strokeWidth="4"
-                        strokeDasharray="6 6"
-                        className="animate-pulse"
-                      />
-                    </svg>
-
-                    {/* Origin Pin (Atlanta Hub) */}
-                    <div className="absolute left-[100px] top-[260px] flex flex-col items-center">
-                      <div className="px-2 py-1 rounded bg-slate-900 text-white text-[10px] font-bold shadow-md whitespace-nowrap mb-1">
-                        Origin: Atlanta, GA (Hub)
-                      </div>
-                      <div className="w-4 h-4 rounded-full bg-slate-900 border-2 border-white shadow" />
-                    </div>
-
-                    {/* Destination Pin */}
-                    <div className="absolute right-[80px] top-[140px] flex flex-col items-center">
-                      <div className="px-2 py-1 rounded bg-emerald-700 text-white text-[10px] font-bold shadow-md whitespace-nowrap mb-1">
-                        Dest: Augusta, GA
-                      </div>
-                      <div className="w-4 h-4 rounded-full bg-emerald-600 border-2 border-white shadow" />
-                    </div>
-
-                    {/* Live Package Active GPS Pin */}
-                    <div className="absolute left-[54%] top-[42%] transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-20">
-                      <div className="relative">
-                        <div className="w-12 h-12 rounded-full bg-blue-500/20 animate-ping absolute -inset-1" />
-                        <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-xl border-2 border-white relative z-10">
-                          <Truck className="w-5 h-5" />
-                        </div>
-                      </div>
-                      <div className="bg-white/95 backdrop-blur-sm border border-slate-300 rounded-lg p-2 mt-2 shadow-lg text-center">
-                        <p className="text-[11px] font-bold text-blue-900 leading-tight">Current Courier Location</p>
-                        <p className="text-[10px] text-slate-600 font-medium">Augusta Regional Vicinity</p>
-                      </div>
-                    </div>
-
-                    {/* Map footer watermark & legend */}
-                    <div className="relative z-10 mt-auto flex items-center justify-between text-xs text-slate-500 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-slate-200">
-                      <span className="font-semibold text-slate-700">Mapbox GL JS Engine • Georgia Territory</span>
-                      <span>Next scan expected: &lt; 30 mins</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Package Specs Summary */}
-              <div className="p-6 bg-white border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div>
-                  <span className="text-xs text-slate-500 block">Total Weight</span>
-                  <span className="text-sm font-bold text-slate-900">{shipment.packageDetails.weightLbs} lbs</span>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-500 block">Dimensions</span>
-                  <span className="text-sm font-bold text-slate-900">
-                    {shipment.packageDetails.dimensions.length}x{shipment.packageDetails.dimensions.width}x
-                    {shipment.packageDetails.dimensions.height} in
-                  </span>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-500 block">Package Type</span>
-                  <span className="text-sm font-bold text-slate-900 capitalize">{shipment.packageDetails.packageType}</span>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-500 block">Handling</span>
-                  <span className="text-sm font-bold text-slate-900">
-                    {shipment.packageDetails.isFragile ? 'Fragile / Signed' : 'Standard'}
-                  </span>
-                </div>
-              </div>
-            </div>
+        <section className="grid grid-cols-1 gap-px border border-slate-200 bg-slate-200 sm:grid-cols-2">
+          <div className="bg-white p-6">
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              Pickup address
+            </p>
+            <p className="mt-2 font-bold">{shipment.sender.name}</p>
+            <p className="mt-1 text-sm text-slate-600">
+              {shipment.sender.street}
+              {shipment.sender.suite ? `, ${shipment.sender.suite}` : ""}
+            </p>
+            <p className="text-sm text-slate-600">
+              {shipment.sender.city}, {shipment.sender.state}{" "}
+              {shipment.sender.zip}
+            </p>
           </div>
+          <div className="bg-white p-6">
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              Delivery address
+            </p>
+            <p className="mt-2 font-bold">{shipment.recipient.name}</p>
+            <p className="mt-1 text-sm text-slate-600">
+              {shipment.recipient.street}
+              {shipment.recipient.suite ? `, ${shipment.recipient.suite}` : ""}
+            </p>
+            <p className="text-sm text-slate-600">
+              {shipment.recipient.city}, {shipment.recipient.state}{" "}
+              {shipment.recipient.zip}
+            </p>
+          </div>
+        </section>
 
-          {/* Right: Milestone Timeline Logs (5 cols) */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-              <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center justify-between">
-                <span>Tracking Milestones</span>
-                <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-1 rounded">
-                  {shipment.trackingLogs.length} updates
-                </span>
-              </h3>
-
-              <div className="relative border-l-2 border-slate-200 ml-3 pl-6 space-y-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+          <section className="border border-slate-200 bg-white p-6">
+            <h3 className="flex items-center gap-2 font-bold">
+              <Package className="h-4 w-4" /> Package
+            </h3>
+            <dl className="mt-4 space-y-3 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-500">Weight</dt>
+                <dd className="font-semibold">
+                  {shipment.packageDetails.weightLbs.toFixed(1)} lb
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-500">Dimensions</dt>
+                <dd className="font-semibold">
+                  {shipment.packageDetails.dimensions.length} ×{" "}
+                  {shipment.packageDetails.dimensions.width} ×{" "}
+                  {shipment.packageDetails.dimensions.height}{" "}
+                  {shipment.packageDetails.dimensions.unit}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-500">Type</dt>
+                <dd className="font-semibold capitalize">
+                  {shipment.packageDetails.packageType.replaceAll("_", " ")}
+                </dd>
+              </div>
+            </dl>
+          </section>
+          <section className="border border-slate-200 bg-white p-6">
+            <h3 className="font-bold">Tracking history</h3>
+            {shipment.trackingLogs.length ? (
+              <ol className="mt-4 space-y-4 border-l border-slate-200 pl-4">
                 {shipment.trackingLogs
                   .slice()
                   .reverse()
-                  .map((log, index) => {
-                    const isLatest = index === 0;
-                    return (
-                      <div key={log.id} className="relative">
-                        {/* Dot indicator */}
-                        <div
-                          className={`absolute -left-[31px] top-1 w-4 h-4 rounded-full border-2 border-white ${
-                            isLatest ? 'bg-blue-600 ring-4 ring-blue-100' : 'bg-slate-400'
-                          }`}
-                        />
-                        <div>
-                          <div className="flex items-baseline justify-between gap-2">
-                            <h4 className={`text-sm font-bold ${isLatest ? 'text-blue-900' : 'text-slate-800'}`}>
-                              {log.title}
-                            </h4>
-                            <span className="text-[11px] text-slate-400 whitespace-nowrap">
-                              {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-600 mt-1">{log.description}</p>
-                          <p className="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {log.location.facilityName || `${log.location.city}, ${log.location.state}`}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            </div>
-
-            {/* Hub Support & Assistance Card */}
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-6 shadow-sm">
-              <h4 className="font-bold text-base flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-blue-400" />
-                JB & Best Logistics Support Hub
-              </h4>
-              <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                Need to redirect this package, arrange warehouse hold, or schedule notary/packing assistance in Georgia?
+                  .map((event) => (
+                    <li key={event.id} className="relative">
+                      <span className="absolute -left-[21px] top-1 h-3 w-3 rounded-full bg-blue-700 ring-4 ring-white" />
+                      <p className="text-sm font-semibold">{event.title}</p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        {event.description}
+                      </p>
+                      <p className="mt-1 inline-flex items-center gap-1 text-xs text-slate-500">
+                        <MapPin className="h-3 w-3" />
+                        {event.location.city}, {event.location.state} ·{" "}
+                        {new Date(event.timestamp).toLocaleString()}
+                      </p>
+                    </li>
+                  ))}
+              </ol>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500">
+                No tracking events yet.
               </p>
-              <div className="mt-4 pt-4 border-t border-slate-700/80 flex items-center justify-between text-xs">
-                <div>
-                  <span className="text-slate-400 block">Store Dispatch</span>
-                  <strong className="text-white">+1 (404) 555-0199</strong>
-                </div>
-                <a
-                  href="#contact"
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-medium transition"
-                >
-                  Contact Desk
-                </a>
-              </div>
-            </div>
-          </div>
+            )}
+          </section>
         </div>
+        <p className="flex items-center gap-2 text-xs text-slate-500">
+          <ArrowRight className="h-3.5 w-3.5" />
+          Shipment details refresh automatically while this page is open.
+        </p>
       </div>
-    </div>
+    </main>
   );
 }

@@ -67,6 +67,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
     setAuthError("");
     setIsSubmitting(true);
     const form = new FormData(event.currentTarget);
+    localStorage.removeItem("jb_best_token");
 
     try {
       const response =
@@ -312,6 +313,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   <input
                     name="password"
                     required
+                    minLength={isSignUp && mode === "customer" ? 8 : undefined}
                     type="password"
                     placeholder="Enter your password"
                     className="auth-input bg-slate-50"
