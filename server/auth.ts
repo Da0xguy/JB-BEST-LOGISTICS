@@ -18,6 +18,9 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
     if (!mongoose.isValidObjectId(payload.sub)) return res.status(401).json({ error: 'Invalid session' });
     const user = await User.findById(payload.sub).select('+passwordHash');
     if (!user || user.status !== 'active') return res.status(401).json({ error: 'Account is unavailable' });
+    if (user.mustChangePassword && req.path !== '/api/auth/change-password') {
+      return res.status(403).json({ error: 'Change your temporary password before continuing', code: 'PASSWORD_CHANGE_REQUIRED' });
+    }
     req.user = user;
     next();
   } catch {
@@ -37,5 +40,6 @@ export const publicUser = (user: UserDocument) => ({
   phone: user.phone,
   role: user.role,
   status: user.status,
+  mustChangePassword: user.mustChangePassword,
   branchId: user.branchId,
 });

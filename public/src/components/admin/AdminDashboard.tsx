@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   BarChart3,
   DollarSign,
   Package,
-  Key,
   Users,
   TrendingUp,
   ShieldCheck,
@@ -21,15 +20,28 @@ import {
   Code,
   Calendar,
   Building,
+  UserPlus,
+  RefreshCw,
+  UserRoundCheck,
+  UserRoundX,
+  Trash2,
 } from "lucide-react";
 import {
   Shipment,
   Invoice,
   Appointment,
   PickupRequest,
-  MailboxRental,
   PaymentGateway,
 } from "../../types";
+import {
+  AdminUser,
+  listAdminUsers,
+  provisionAdminUser,
+  ProvisionableRole,
+  updateAdminUserStatus,
+  deleteStaffAccount,
+} from "../../lib/api";
+import { AdminShipmentAssignmentsView } from "./AdminShipmentAssignmentsView";
 
 interface AdminDashboardProps {
   shipments: Shipment[];
@@ -38,84 +50,7 @@ interface AdminDashboardProps {
   pickups: PickupRequest[];
   onUpdateInvoice: (invoice: Invoice) => void;
   onOpenArchitecture: () => void;
-  onSwitchToConsumer: () => void;
-  onSwitchToStaff: () => void;
 }
-
-const INITIAL_MAILBOX_ROSTER: MailboxRental[] = [
-  {
-    boxNumber: "#101",
-    renterName: "Marcus Sterling",
-    companyName: "Savannah Timber Co.",
-    email: "marcus@savannahtimber.com",
-    phone: "(912) 555-9201",
-    tier: "Corporate 24/7",
-    status: "active",
-    renewalDate: "2027-01-15",
-    keyFobId: "FOB-9921",
-    packagesHeld: 2,
-  },
-  {
-    boxNumber: "#102",
-    renterName: "Elena Rostova",
-    companyName: "Piedmont Design Studio",
-    email: "elena@piedmontdesign.co",
-    phone: "(404) 555-4411",
-    tier: "Business",
-    status: "active",
-    renewalDate: "2026-11-30",
-    keyFobId: "FOB-8812",
-    packagesHeld: 1,
-  },
-  {
-    boxNumber: "#103",
-    renterName: "David Chen",
-    companyName: "TechVentures ATL",
-    email: "dchen@techventures.io",
-    phone: "(404) 555-8833",
-    tier: "Corporate 24/7",
-    status: "renewal_due",
-    renewalDate: "2026-09-12",
-    keyFobId: "FOB-7704",
-    packagesHeld: 4,
-  },
-  {
-    boxNumber: "#104",
-    renterName: "Sarah Jenkins",
-    companyName: "",
-    email: "sarah.jenkins@gmail.com",
-    phone: "(404) 555-0123",
-    tier: "Personal",
-    status: "active",
-    renewalDate: "2027-03-01",
-    keyFobId: "FOB-6641",
-    packagesHeld: 0,
-  },
-  {
-    boxNumber: "#105",
-    renterName: "Vacant",
-    companyName: "",
-    email: "",
-    phone: "",
-    tier: "Business",
-    status: "available",
-    renewalDate: "—",
-    keyFobId: "UNASSIGNED",
-    packagesHeld: 0,
-  },
-  {
-    boxNumber: "#106",
-    renterName: "Vacant",
-    companyName: "",
-    email: "",
-    phone: "",
-    tier: "Personal",
-    status: "available",
-    renewalDate: "—",
-    keyFobId: "UNASSIGNED",
-    packagesHeld: 0,
-  },
-];
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   shipments,
@@ -124,30 +59,138 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   pickups,
   onUpdateInvoice,
   onOpenArchitecture,
-  onSwitchToConsumer,
-  onSwitchToStaff,
 }) => {
   const [activeAdminTab, setActiveAdminTab] = useState<
-    "kpis" | "invoices" | "mailboxes" | "staff" | "settings"
+    "kpis" | "shipments" | "invoices" | "staff"
   >("kpis");
 
-  const [mailboxes, setMailboxes] = useState<MailboxRental[]>(
-    INITIAL_MAILBOX_ROSTER,
-  );
   const [invoiceFilter, setInvoiceFilter] = useState<
     "all" | "paid" | "pending"
   >("all");
   const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
-  const [showMailboxModal, setShowMailboxModal] = useState(false);
-  const [selectedMailbox, setSelectedMailbox] = useState<MailboxRental | null>(
-    null,
-  );
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerEmail, setNewCustomerEmail] = useState("");
   const [newItemDesc, setNewItemDesc] = useState(
     "Commercial Freight & Custom Packaging",
   );
   const [newItemAmount, setNewItemAmount] = useState("150.00");
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [usersError, setUsersError] = useState("");
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [newAccountRole, setNewAccountRole] =
+    useState<ProvisionableRole>("rider");
+  const [createUserError, setCreateUserError] = useState("");
+  const [createdTemporaryPassword, setCreatedTemporaryPassword] = useState<
+    string | null
+  >(null);
+
+  useEffect(() => {
+    if (activeAdminTab !== "staff") return;
+    let isCurrent = true;
+    setIsLoadingUsers(true);
+    setUsersError("");
+    listAdminUsers()
+      .then(({ users }) => {
+        if (isCurrent) setAdminUsers(users);
+      })
+      .catch((error: unknown) => {
+        if (isCurrent)
+          setUsersError(
+            error instanceof Error ? error.message : "Unable to load accounts",
+          );
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoadingUsers(false);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [activeAdminTab]);
+
+  const handleCreateUser = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setCreateUserError("");
+    setCreatedTemporaryPassword(null);
+    setIsCreatingUser(true);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const role = String(form.get("role")) as ProvisionableRole;
+    try {
+      const result = await provisionAdminUser({
+        name: String(form.get("name") || "").trim(),
+        email: String(form.get("email") || "").trim(),
+        phone: String(form.get("phone") || "").trim() || undefined,
+        role,
+        ...(role === "rider"
+          ? {
+              vehicleType: String(form.get("vehicleType")) as
+                | "bike"
+                | "van"
+                | "truck",
+              weightCapacityKg: Number(form.get("weightCapacityKg")),
+            }
+          : {}),
+      });
+      setAdminUsers((current) => [result.user, ...current]);
+      setCreatedTemporaryPassword(result.temporaryPassword || null);
+      setShowCreateUserModal(false);
+      formElement.reset();
+    } catch (error) {
+      setCreateUserError(
+        error instanceof Error ? error.message : "Unable to create account",
+      );
+    } finally {
+      setIsCreatingUser(false);
+    }
+  };
+
+  const handleStaffStatusChange = async (user: AdminUser) => {
+    const status = user.status === "active" ? "suspended" : "active";
+    setUsersError("");
+    setUpdatingUserId(user.id);
+    try {
+      const result = await updateAdminUserStatus(user.id, status);
+      setAdminUsers((current) =>
+        current.map((account) =>
+          account.id === result.user.id ? result.user : account,
+        ),
+      );
+    } catch (error) {
+      setUsersError(
+        error instanceof Error ? error.message : "Unable to update account",
+      );
+    } finally {
+      setUpdatingUserId(null);
+    }
+  };
+
+  const handleDeleteStaff = async (user: AdminUser) => {
+    if (
+      user.role === "admin" ||
+      !window.confirm(
+        `Permanently delete ${user.name}'s ${user.role.replaceAll("_", " ")} account? This cannot be undone.`,
+      )
+    )
+      return;
+    setUsersError("");
+    setDeletingUserId(user.id);
+    try {
+      await deleteStaffAccount(user.id);
+      setAdminUsers((current) =>
+        current.filter((account) => account.id !== user.id),
+      );
+    } catch (error) {
+      setUsersError(
+        error instanceof Error ? error.message : "Unable to delete account",
+      );
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
 
   // KPI Calculations
   const totalBilled = invoices.reduce(
@@ -159,14 +202,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     .reduce((acc, inv) => acc + (inv.totalAmount || 0), 0);
   const totalPending = totalBilled - totalCollected;
   const totalParcels = shipments.length;
-  const activeMailboxCount = mailboxes.filter(
-    (m) => m.status !== "available",
-  ).length;
-  const mailboxOccupancyRate = (
-    (activeMailboxCount / mailboxes.length) *
-    100
-  ).toFixed(0);
-
   const filteredInvoices = invoices.filter((inv) => {
     if (invoiceFilter === "paid") return inv.status === "paid";
     if (invoiceFilter === "pending") return inv.status !== "paid";
@@ -214,42 +249,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
-      {/* Executive Header Banner */}
-      <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-1.5">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-semibold border border-blue-500/20">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Store Executive & Operations Console</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-display font-bold text-white tracking-tight">
-            Store Management Dashboard
-          </h2>
-          <p className="text-sm text-slate-400 max-w-2xl">
-            High-level oversight of retail revenue, multi-carrier logistics,
-            customer invoicing, and private mailbox leases for JB & Best
-            Logistics.
-          </p>
-        </div>
-
-        {/* Quick Portal Switchers */}
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <button
-            onClick={onSwitchToStaff}
-            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition cursor-pointer flex items-center gap-1.5"
-          >
-            <Truck className="w-3.5 h-3.5 text-amber-400" />
-            <span>Switch to Staff Console</span>
-          </button>
-          <button
-            onClick={onSwitchToConsumer}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition cursor-pointer flex items-center gap-1.5 shadow-sm"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>View Public Storefront</span>
-          </button>
-        </div>
-      </div>
-
       {/* Top 4 KPI Executive Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-3xl border border-gray-200/80 p-5 shadow-xs space-y-2">
@@ -294,23 +293,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="bg-white rounded-3xl border border-gray-200/80 p-5 shadow-xs space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-gray-500">
-              Mailbox Occupancy
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-              <Key className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-display font-bold text-gray-900">
-            {mailboxOccupancyRate}%
-          </div>
-          <p className="text-xs text-gray-500">
-            {activeMailboxCount} of {mailboxes.length} units leased
-          </p>
-        </div>
-
-        <div className="bg-white rounded-3xl border border-gray-200/80 p-5 shadow-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-500">
               Doorstep Dispatches
             </span>
             <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
@@ -330,10 +312,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <div className="flex items-center gap-2 border-b border-gray-200 overflow-x-auto pb-px">
         {[
           { id: "kpis", label: "Executive Analytics", icon: BarChart3 },
+          { id: "shipments", label: "Shipments", icon: Package },
           { id: "invoices", label: "Billing & Invoices", icon: Receipt },
-          { id: "mailboxes", label: "Mailbox Center", icon: Key },
-          { id: "staff", label: "Staff & Drivers", icon: Users },
-          { id: "settings", label: "System & Architecture", icon: Code },
+          { id: "staff", label: "Team & Accounts", icon: Users },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeAdminTab === tab.id;
@@ -478,6 +459,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
+      {activeAdminTab === "shipments" && <AdminShipmentAssignmentsView />}
+
       {/* MODULE 2: Billing & Invoices Management */}
       {activeAdminTab === "invoices" && (
         <div className="space-y-6">
@@ -586,278 +569,289 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* MODULE 3: Mailbox Center Roster */}
-      {activeAdminTab === "mailboxes" && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-3xl border border-gray-200/80 p-6 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">
-                  Private Mailbox Units (Box #101 – #106)
-                </h3>
-                <p className="text-xs text-gray-500">
-                  Street address rentals, 24/7 key fob assignments, and package
-                  hold records.
-                </p>
-              </div>
-              <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200">
-                {activeMailboxCount} Occupied / {mailboxes.length} Total
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {mailboxes.map((box) => (
-                <div
-                  key={box.boxNumber}
-                  className={`p-4 rounded-2xl border transition ${
-                    box.status === "available"
-                      ? "bg-gray-50/60 border-dashed border-gray-300"
-                      : box.status === "renewal_due"
-                        ? "bg-amber-50/60 border-amber-300"
-                        : "bg-white border-gray-200/80 shadow-xs"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-base font-display font-bold text-gray-900">
-                      {box.boxNumber}
-                    </span>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                        box.status === "available"
-                          ? "bg-gray-200 text-gray-700"
-                          : box.status === "renewal_due"
-                            ? "bg-amber-200 text-amber-900"
-                            : "bg-emerald-100 text-emerald-800"
-                      }`}
-                    >
-                      {box.status.replace("_", " ")}
-                    </span>
-                  </div>
-
-                  {box.status !== "available" ? (
-                    <div className="space-y-1 text-xs text-gray-600">
-                      <p className="font-bold text-gray-900">
-                        {box.renterName}
-                      </p>
-                      {box.companyName && (
-                        <p className="text-gray-500">{box.companyName}</p>
-                      )}
-                      <p className="text-gray-400">
-                        Renewal: {box.renewalDate}
-                      </p>
-                      <div className="pt-2 flex items-center justify-between text-[11px] border-t border-gray-100">
-                        <span className="font-mono text-gray-500">
-                          {box.keyFobId}
-                        </span>
-                        <span className="font-semibold text-blue-600">
-                          {box.packagesHeld} pkgs held
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-xs text-gray-400 py-3 text-center">
-                      <p>Available for lease</p>
-                      <button
-                        onClick={() => {
-                          setSelectedMailbox(box);
-                          setShowMailboxModal(true);
-                        }}
-                        className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700 cursor-pointer"
-                      >
-                        + Assign Mailbox
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* MODULE 4: Staff & Driver Roster */}
       {activeAdminTab === "staff" && (
         <div className="space-y-6">
-          <div className="bg-white rounded-3xl border border-gray-200/80 p-6 shadow-xs space-y-4">
-            <h3 className="text-lg font-bold text-gray-900">
-              Today&apos;s Store Roster & Shifts
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                {
-                  name: "Marcus Taylor",
-                  role: "Store Associate #1",
-                  status: "Register #1 Open",
-                  badge: "On Duty",
-                },
-                {
-                  name: "Sarah Jenkins",
-                  role: "Georgia Notary Concierge",
-                  status: "In Consultation",
-                  badge: "Busy",
-                },
-                {
-                  name: "David Ramirez",
-                  role: "Van Driver (Midtown/Buckhead)",
-                  status: "On Route #2",
-                  badge: "In Field",
-                },
-              ].map((staff) => (
-                <div
-                  key={staff.name}
-                  className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80 space-y-1.5"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="font-bold text-sm text-gray-900">
-                      {staff.name}
-                    </p>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      {staff.badge}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500">{staff.role}</p>
-                  <p className="text-xs text-blue-600 font-medium pt-1">
-                    {staff.status}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODULE 5: Settings & System Blueprint */}
-      {activeAdminTab === "settings" && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-3xl border border-gray-200/80 p-6 sm:p-8 shadow-xs space-y-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-lg font-bold text-gray-900">
-                System Configuration & Security
-              </h3>
-              <p className="text-xs text-gray-500">
-                JB & Best Logistics operational parameters, Georgia sales tax
-                configuration, and multi-tenant cloud setup.
+              <h3 className="text-lg font-bold text-gray-900">Team accounts</h3>
+              <p className="text-sm text-gray-500">
+                Manage administrators, riders, and warehouse access.
               </p>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80 space-y-1">
-                <span className="font-bold text-gray-700 block">
-                  Georgia State Sales Tax Rate
-                </span>
-                <p className="text-gray-500">
-                  Configured: 8.9% (Fulton County / Atlanta Local Option)
-                </p>
-              </div>
-              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80 space-y-1">
-                <span className="font-bold text-gray-700 block">
-                  Payment Gateways
-                </span>
-                <p className="text-gray-500">
-                  Stripe (US Card Payments) & Paystack (International Transfers)
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-bold text-gray-900">
-                  System Architecture & Blueprint
-                </h4>
-                <p className="text-xs text-gray-500">
-                  Inspect the complete Firestore schema, RBAC permissions, and
-                  API workflows.
-                </p>
-              </div>
-              <button
-                onClick={onOpenArchitecture}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
-              >
-                <Code className="w-3.5 h-3.5" />
-                <span>View Architecture Specs</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setCreateUserError("");
+                setShowCreateUserModal(true);
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+            >
+              <UserPlus className="h-4 w-4" />
+              Create account
+            </button>
           </div>
-        </div>
-      )}
 
-      {showMailboxModal && selectedMailbox && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-xl space-y-4 animate-in zoom-in-95">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-lg font-bold text-gray-900">
-                Assign Mailbox {selectedMailbox.boxNumber}
-              </h3>
+          {createdTemporaryPassword && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+              <p className="font-semibold">Temporary password, shown once</p>
+              <p className="mt-1 font-mono select-all">
+                {createdTemporaryPassword}
+              </p>
+              <p className="mt-1 text-xs text-amber-800">
+                The new account must change this password at first sign-in.
+              </p>
               <button
                 type="button"
-                onClick={() => setShowMailboxModal(false)}
-                className="rounded-full bg-gray-100 px-2 py-1 text-gray-600 hover:bg-gray-200 cursor-pointer"
+                onClick={() => setCreatedTemporaryPassword(null)}
+                className="mt-2 text-xs font-semibold underline"
               >
-                ✕
+                Dismiss
               </button>
             </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setMailboxes((prev) =>
-                  prev.map((m) =>
-                    m.boxNumber === selectedMailbox.boxNumber
-                      ? {
-                          ...m,
-                          renterName: "New Commercial Client",
-                          companyName: "JB & Best Logistics Client",
-                          email: "newclient@jbbestlogistics.com",
-                          phone: "(404) 555-0178",
-                          status: "active",
-                          renewalDate: "2027-09-01",
-                          keyFobId: `FOB-${Math.floor(1000 + Math.random() * 9000)}`,
-                          packagesHeld: 1,
-                        }
-                      : m,
-                  ),
-                );
-                setShowMailboxModal(false);
-                setSelectedMailbox(null);
-              }}
-              className="space-y-3 text-xs sm:text-sm"
-            >
-              <div>
-                <label className="block text-gray-600 font-medium mb-1">
-                  Leaseholder Name
-                </label>
-                <input
-                  type="text"
-                  defaultValue="New Commercial Client"
-                  className="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none"
-                />
+          )}
+
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            {usersError && (
+              <div className="p-4 text-sm text-red-700" role="alert">
+                {usersError}
               </div>
-              <div>
-                <label className="block text-gray-600 font-medium mb-1">
-                  Business / Company
-                </label>
-                <input
-                  type="text"
-                  defaultValue="JB & Best Logistics Client"
-                  className="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none"
-                />
+            )}
+            {isLoadingUsers ? (
+              <div className="flex items-center gap-2 p-6 text-sm text-gray-500">
+                <RefreshCw className="h-4 w-4 animate-spin" /> Loading
+                accounts...
               </div>
-              <div className="pt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowMailboxModal(false)}
-                  className="w-1/2 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="w-1/2 py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition cursor-pointer"
-                >
-                  Save Lease
-                </button>
+            ) : adminUsers.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-155 text-left text-sm">
+                  <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Name</th>
+                      <th className="px-4 py-3 font-semibold">Email</th>
+                      <th className="px-4 py-3 font-semibold">Role</th>
+                      <th className="px-4 py-3 font-semibold">
+                        Account status
+                      </th>
+                      <th className="px-4 py-3 font-semibold">First sign-in</th>
+                      <th className="px-4 py-3 font-semibold">Access</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-gray-700">
+                    {adminUsers.map((user) => (
+                      <tr key={user.id}>
+                        <td className="px-4 py-3 font-semibold text-gray-900">
+                          {user.name}
+                        </td>
+                        <td className="px-4 py-3">{user.email}</td>
+                        <td className="px-4 py-3 capitalize">
+                          {user.role.replaceAll("_", " ")}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              user.status === "active"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {user.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-500">
+                          {user.mustChangePassword
+                            ? "Password change required"
+                            : "Ready"}
+                        </td>
+                        <td className="px-4 py-3">
+                          {user.role === "admin" ? (
+                            <span className="text-xs text-gray-400">
+                              Protected
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void handleStaffStatusChange(user)}
+                              disabled={
+                                updatingUserId !== null ||
+                                deletingUserId !== null
+                              }
+                              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold disabled:cursor-wait disabled:opacity-50 ${
+                                user.status === "active"
+                                  ? "text-red-700 hover:bg-red-50"
+                                  : "text-emerald-700 hover:bg-emerald-50"
+                              }`}
+                            >
+                              {user.status === "active" ? (
+                                <UserRoundX className="h-3.5 w-3.5" />
+                              ) : (
+                                <UserRoundCheck className="h-3.5 w-3.5" />
+                              )}
+                              {updatingUserId === user.id
+                                ? "Updating..."
+                                : user.status === "active"
+                                  ? "Restrict"
+                                  : "Restore access"}
+                            </button>
+                          )}
+                          {user.role !== "admin" && (
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteStaff(user)}
+                              disabled={
+                                updatingUserId !== null ||
+                                deletingUserId !== null
+                              }
+                              aria-label={`Delete ${user.name}'s account`}
+                              title="Delete staff account"
+                              className="ml-1 inline-flex items-center rounded-lg p-1.5 text-red-700 hover:bg-red-50 disabled:cursor-wait disabled:opacity-50"
+                            >
+                              {deletingUserId === user.id ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </form>
+            ) : (
+              !usersError && (
+                <p className="p-6 text-sm text-gray-500">
+                  No team accounts yet.
+                </p>
+              )
+            )}
           </div>
+
+          {showCreateUserModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
+              <div className="max-h-[90vh] w-full max-w-lg space-y-5 overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">
+                      Create team account
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      A generated temporary password is shown once after
+                      creation.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateUserModal(false)}
+                    aria-label="Close account form"
+                    className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                  >
+                    ×
+                  </button>
+                </div>
+                <form onSubmit={handleCreateUser} className="space-y-4">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Full name
+                    <input
+                      name="name"
+                      required
+                      autoComplete="name"
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 font-normal focus:border-blue-500 focus:outline-none"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Work email
+                    <input
+                      name="email"
+                      type="email"
+                      required
+                      autoComplete="email"
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 font-normal focus:border-blue-500 focus:outline-none"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Phone{" "}
+                    <span className="font-normal text-gray-400">
+                      (optional)
+                    </span>
+                    <input
+                      name="phone"
+                      type="tel"
+                      autoComplete="tel"
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 font-normal focus:border-blue-500 focus:outline-none"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Account role
+                    <select
+                      name="role"
+                      defaultValue="rider"
+                      onChange={(event) =>
+                        setNewAccountRole(
+                          event.target.value as ProvisionableRole,
+                        )
+                      }
+                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 focus:border-blue-500 focus:outline-none"
+                    >
+                      <option value="admin">Administrator</option>
+                      <option value="rider">Rider</option>
+                      <option value="warehouse">Warehouse</option>
+                    </select>
+                  </label>
+                  {newAccountRole === "rider" && (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Rider vehicle
+                        <select
+                          name="vehicleType"
+                          defaultValue="van"
+                          className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 focus:border-blue-500 focus:outline-none"
+                        >
+                          <option value="bike">Bike</option>
+                          <option value="van">Van</option>
+                          <option value="truck">Truck</option>
+                        </select>
+                      </label>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Capacity (kg)
+                        <input
+                          name="weightCapacityKg"
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          defaultValue="100"
+                          required
+                          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:border-blue-500 focus:outline-none"
+                        />
+                      </label>
+                    </div>
+                  )}
+                  {createUserError && (
+                    <p className="text-sm text-red-700" role="alert">
+                      {createUserError}
+                    </p>
+                  )}
+                  <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateUserModal(false)}
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isCreatingUser}
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      {isCreatingUser ? "Creating..." : "Create account"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

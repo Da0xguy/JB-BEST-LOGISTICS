@@ -81,6 +81,12 @@ export const Navbar: React.FC<NavbarProps> = ({
       icon: CreditCard,
       desc: "Invoices & digital receipts",
     },
+    {
+      id: "profile",
+      label: "Profile",
+      icon: User,
+      desc: "Saved contact and pickup details",
+    },
   ];
 
   const serviceLinks = [

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -13,6 +13,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { Appointment, AppointmentServiceType } from "../types";
+import { createAppointmentBooking, CustomerProfile } from "../lib/api";
 
 interface AppointmentBookingViewProps {
   appointments: Appointment[];
@@ -22,6 +23,7 @@ interface AppointmentBookingViewProps {
     message: string,
     variant?: "success" | "error" | "info" | "processing",
   ) => void;
+  profile?: CustomerProfile | null;
 }
 
 const SERVICES = [
@@ -137,6 +139,7 @@ export const AppointmentBookingView: React.FC<AppointmentBookingViewProps> = ({
   appointments,
   onAddAppointment,
   onNotify,
+  profile,
 }) => {
   const [selectedService, setSelectedService] =
     useState<AppointmentServiceType>("notary_public");
@@ -149,8 +152,22 @@ export const AppointmentBookingView: React.FC<AppointmentBookingViewProps> = ({
   const [confirmedTicket, setConfirmedTicket] = useState<Appointment | null>(
     null,
   );
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setSelectedDate(tomorrow.toISOString().slice(0, 10));
+  }, []);
+
+  useEffect(() => {
+    if (!profile) return;
+    setName(profile.name);
+    setEmail(profile.email);
+    setPhone(profile.phone);
+  }, [profile]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !phone) {
       onNotify?.(
@@ -166,28 +183,31 @@ export const AppointmentBookingView: React.FC<AppointmentBookingViewProps> = ({
       ? `${currentServiceObj.detailLabel}: ${detailText}`
       : "";
 
-    const newApt: Appointment = {
-      id: `apt-${Date.now()}`,
-      customerId: `cust-${Math.floor(100 + Math.random() * 900)}`,
-      customerName: name,
-      customerEmail: email,
-      customerPhone: phone,
-      serviceType: selectedService,
-      appointmentDate: selectedDate,
-      timeSlot: selectedSlot,
-      notes: fullNotes,
-      status: "confirmed",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    onAddAppointment(newApt);
-    setConfirmedTicket(newApt);
-    setName("");
-    setEmail("");
-    setPhone("");
-    setServiceDetails("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setIsSubmitting(true);
+    try {
+      const { appointment } = await createAppointmentBooking({
+        serviceType: selectedService,
+        appointmentDate: selectedDate,
+        timeSlot: selectedSlot,
+        customerPhone: phone,
+        notes: fullNotes,
+      });
+      onAddAppointment(appointment);
+      setConfirmedTicket(appointment);
+      setName(profile?.name || name);
+      setEmail(profile?.email || email);
+      setPhone(profile?.phone || phone);
+      setServiceDetails("");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      onNotify?.(
+        "Appointment could not be booked",
+        error instanceof Error ? error.message : "Unable to save appointment.",
+        "error",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const currentServiceObj =
@@ -474,9 +494,10 @@ export const AppointmentBookingView: React.FC<AppointmentBookingViewProps> = ({
 
             <button
               type="submit"
-              className="w-full rounded-2xl bg-blue-600 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 cursor-pointer"
+              disabled={isSubmitting}
+              className="w-full rounded-2xl bg-blue-600 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 cursor-pointer disabled:cursor-wait disabled:opacity-60"
             >
-              Confirm appointment
+              {isSubmitting ? "Booking..." : "Confirm appointment"}
             </button>
           </aside>
         </form>

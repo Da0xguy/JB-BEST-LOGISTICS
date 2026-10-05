@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Truck,
   MapPin,
@@ -16,6 +16,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { PickupRequest, Carrier } from "../types";
+import { bookPickupShipment, CustomerProfile } from "../lib/api";
 
 interface PickupSchedulerViewProps {
   pickups: PickupRequest[];
@@ -25,12 +26,14 @@ interface PickupSchedulerViewProps {
     message: string,
     variant?: "success" | "error" | "info" | "processing",
   ) => void;
+  profile?: CustomerProfile | null;
 }
 
 export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
   pickups,
   onAddPickup,
   onNotify,
+  profile,
 }) => {
   const [businessName, setBusinessName] = useState("");
   const [contactName, setContactName] = useState("");
@@ -52,8 +55,54 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
   const [confirmedPickup, setConfirmedPickup] = useState<PickupRequest | null>(
     null,
   );
+  const [lengthInches, setLengthInches] = useState(12);
+  const [widthInches, setWidthInches] = useState(8);
+  const [heightInches, setHeightInches] = useState(6);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setPickupDate(tomorrow.toISOString().slice(0, 10));
+  }, []);
+
+  useEffect(() => {
+    if (!profile) return;
+    setContactName(profile.name);
+    setContactPhone(profile.phone);
+    setContactEmail(profile.email);
+    setStreet(profile.address.street || "");
+    setSuite(profile.address.suite || "");
+    setCity(profile.address.city || "");
+    setState(profile.address.state || "");
+    setZip(profile.address.postalCode || "");
+  }, [profile]);
+
+  const getPickupCoordinates = async (): Promise<[number, number]> => {
+    const sameAsProfile =
+      profile?.address.location &&
+      street === profile.address.street &&
+      city === profile.address.city &&
+      state === profile.address.state &&
+      zip === profile.address.postalCode;
+    if (sameAsProfile) return profile.address.location!.coordinates;
+    if (!navigator.geolocation)
+      throw new Error("This browser cannot provide pickup location.");
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => resolve([coords.longitude, coords.latitude]),
+        () =>
+          reject(
+            new Error(
+              "Allow location access to dispatch a rider to this pickup address.",
+            ),
+          ),
+        { enableHighAccuracy: true, timeout: 10000 },
+      );
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contactName || !contactPhone || !street || !zip) {
       onNotify?.(
@@ -64,38 +113,99 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
       return;
     }
 
-    const pickupId = `PICK-${String(Date.now()).slice(-6)}`;
-    const newPickup: PickupRequest = {
-      id: pickupId,
-      trackingNumber: pickupId,
-      customerId: `cust-${Math.floor(100 + Math.random() * 900)}`,
-      businessName: businessName || undefined,
-      contactName,
-      contactPhone,
-      contactEmail: contactEmail || "customer@example.com",
-      pickupAddress: {
-        street,
-        suite: suite || undefined,
-        city,
-        state,
-        zip,
-        country: "USA",
-      },
-      pickupDate,
-      readyTime,
-      closeTime,
-      preferredCarrier,
-      estimatedPackagesCount: Number(packagesCount),
-      totalWeightLbs: Number(totalWeight),
-      specialInstructions: instructions || "Front door / porch pickup",
-      status: "scheduled",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    setIsSubmitting(true);
+    try {
+      const pickupCoordinates = await getPickupCoordinates();
+      const windowStart = new Date(`${pickupDate}T${readyTime}:00`);
+      const windowEnd = new Date(`${pickupDate}T${closeTime}:00`);
+      if (windowStart <= new Date() || windowEnd <= windowStart) {
+        throw new Error(
+          "Choose a future pickup date and a closing time after the ready time.",
+        );
+      }
+      const booking = await bookPickupShipment({
+        sender: {
+          name: contactName,
+          phone: contactPhone,
+          email: contactEmail || profile?.email,
+          street,
+          suite: suite || undefined,
+          city,
+          state,
+          postalCode: zip,
+          country: profile?.address.country || "USA",
+        },
+        receiver: {
+          name: "JB & Best Logistics Warehouse",
+          phone: "+1 (404) 555-0199",
+          street: "2450 Piedmont Rd NE",
+          city: "Atlanta",
+          state: "GA",
+          postalCode: "30324",
+          country: "USA",
+        },
+        package: {
+          length: Number(lengthInches),
+          width: Number(widthInches),
+          height: Number(heightInches),
+          quantity: Number(packagesCount),
+          weight: Number(totalWeight) * 0.453592,
+          unit: "in",
+          fragile: false,
+        },
+        deliveryOption: "standard",
+        transport: "road",
+        pickupLocation: { type: "Point", coordinates: pickupCoordinates },
+        deliveryLocation: { type: "Point", coordinates: [-84.3674, 33.8224] },
+        appointmentWindow: {
+          start: windowStart.toISOString(),
+          end: windowEnd.toISOString(),
+          slot: `${readyTime} - ${closeTime}`,
+        },
+      });
+      const pickupId = booking.trackingNumber;
+      const newPickup: PickupRequest = {
+        id: pickupId,
+        trackingNumber: pickupId,
+        customerId: booking.shipment.customerId,
+        businessName: businessName || undefined,
+        contactName,
+        contactPhone,
+        contactEmail: contactEmail || "customer@example.com",
+        pickupAddress: {
+          street,
+          suite: suite || undefined,
+          city,
+          state,
+          zip,
+          country: profile?.address.country || "USA",
+        },
+        pickupDate,
+        readyTime,
+        closeTime,
+        preferredCarrier,
+        estimatedPackagesCount: Number(packagesCount),
+        totalWeightLbs: Number(totalWeight),
+        specialInstructions: instructions || "Front door / porch pickup",
+        status: "scheduled",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
 
-    onAddPickup(newPickup);
-    setConfirmedPickup(newPickup);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+      onAddPickup(newPickup);
+      setConfirmedPickup(newPickup);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      onNotify?.(
+        "Pickup could not be booked",
+        error instanceof Error
+          ? error.message
+          : "Unable to create pickup request.",
+        "error",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -316,6 +426,48 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
               </div>
             </div>
 
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {[
+                {
+                  label: "Length (in)",
+                  value: lengthInches,
+                  setValue: setLengthInches,
+                },
+                {
+                  label: "Width (in)",
+                  value: widthInches,
+                  setValue: setWidthInches,
+                },
+                {
+                  label: "Height (in)",
+                  value: heightInches,
+                  setValue: setHeightInches,
+                },
+              ].map((dimension) => (
+                <label
+                  key={dimension.label}
+                  className="block text-xs font-medium text-gray-600"
+                >
+                  {dimension.label}
+                  <input
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    required
+                    value={dimension.value}
+                    onChange={(event) =>
+                      dimension.setValue(Number(event.target.value))
+                    }
+                    className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs sm:text-sm focus:border-blue-600 focus:bg-white focus:outline-none"
+                  />
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500">
+              A nearby available rider is selected using package dimensions and
+              total weight.
+            </p>
+
             {/* Optional Gate Code / Notes Toggle */}
             <div className="pt-2">
               <button
@@ -351,10 +503,13 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
 
           <button
             type="submit"
-            className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-2xl transition shadow-sm flex items-center justify-center gap-2 cursor-pointer mt-4"
+            disabled={isSubmitting}
+            className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-2xl transition shadow-sm flex items-center justify-center gap-2 cursor-pointer mt-4 disabled:cursor-wait disabled:opacity-60"
           >
             <Truck className="w-4 h-4" />
-            <span>Confirm Pickup Request</span>
+            <span>
+              {isSubmitting ? "Booking pickup..." : "Confirm Pickup Request"}
+            </span>
           </button>
         </form>
 

@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   ArrowLeft,
-  BriefcaseBusiness,
   LockKeyhole,
   Mail,
   Package,
@@ -9,27 +8,59 @@ import {
   User,
   X,
 } from "lucide-react";
-import { login, register } from "../lib/api";
+import { changePassword, login, register } from "../lib/api";
+import { AuthRole } from "../lib/api";
 
-type AuthRole = "customer" | "staff" | "admin";
+type AuthMode = "customer" | "rider" | "staff" | "admin";
 type Portal = "consumer" | "staff" | "admin";
 type UserRole = "customer" | "associate" | "admin";
 
 interface AuthViewProps {
+  mode?: AuthMode;
   onBack: () => void;
   setPortal: (portal: Portal) => void;
   setUserRole: (role: UserRole) => void;
+  onAuthenticated?: (mode: AuthMode, role: AuthRole) => void;
 }
 
 export const AuthView: React.FC<AuthViewProps> = ({
+  mode = "customer",
   onBack,
   setPortal,
   setUserRole,
+  onAuthenticated,
 }) => {
   const [isSignUp, setIsSignUp] = useState(false);
-  const [authRole, setAuthRole] = useState<AuthRole>("customer");
+  const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
   const [authError, setAuthError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authenticatedRole, setAuthenticatedRole] = useState<AuthRole>(
+    mode === "admin"
+      ? "admin"
+      : mode === "rider"
+        ? "rider"
+        : mode === "staff"
+          ? "warehouse"
+          : "customer",
+  );
+
+  const completeAuthentication = (role: AuthRole = authenticatedRole) => {
+    if (onAuthenticated) {
+      onAuthenticated(mode, role);
+      return;
+    }
+    setUserRole(
+      role === "admin"
+        ? "admin"
+        : role === "customer"
+          ? "customer"
+          : "associate",
+    );
+    setPortal(
+      role === "customer" ? "consumer" : role === "admin" ? "admin" : "staff",
+    );
+    onBack();
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -39,7 +70,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
     try {
       const response =
-        isSignUp && authRole === "customer"
+        isSignUp && mode === "customer"
           ? await register(
               String(form.get("name") || ""),
               String(form.get("email") || ""),
@@ -49,19 +80,22 @@ export const AuthView: React.FC<AuthViewProps> = ({
               String(form.get("email") || ""),
               String(form.get("password") || ""),
             );
-      localStorage.setItem("jb_best_token", response.token);
       const role = response.user.role;
-      setUserRole(
-        role === "rider" || role === "warehouse" ? "associate" : role,
-      );
-      setPortal(
-        role === "customer"
-          ? "consumer"
-          : role === "rider" || role === "warehouse"
-            ? "staff"
-            : "admin",
-      );
-      onBack();
+      setAuthenticatedRole(role);
+      const allowed =
+        (mode === "customer" && role === "customer") ||
+        (mode === "rider" && role === "rider") ||
+        (mode === "staff" && ["warehouse", "warehouse_staff"].includes(role)) ||
+        (mode === "admin" && role === "admin");
+      if (!allowed)
+        throw new Error(`This account cannot access the ${mode} portal.`);
+
+      localStorage.setItem("jb_best_token", response.token);
+      if (response.user.mustChangePassword) {
+        setNeedsPasswordChange(true);
+        return;
+      }
+      completeAuthentication(role);
     } catch (error) {
       setAuthError(
         error instanceof Error ? error.message : "Unable to authenticate",
@@ -70,6 +104,47 @@ export const AuthView: React.FC<AuthViewProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  const handlePasswordChange = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    setAuthError("");
+    const form = new FormData(event.currentTarget);
+    const newPassword = String(form.get("newPassword") || "");
+    if (newPassword.length < 12) {
+      setAuthError("Use at least 12 characters for your new password.");
+      return;
+    }
+    if (newPassword !== form.get("confirmPassword")) {
+      setAuthError("The passwords do not match.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await changePassword(newPassword);
+      setNeedsPasswordChange(false);
+      setAuthError("");
+      completeAuthentication();
+    } catch (error) {
+      setAuthError(
+        error instanceof Error ? error.message : "Unable to change password",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const portalTitle = needsPasswordChange
+    ? "Set a new password"
+    : mode === "rider"
+      ? "Rider sign in"
+      : mode === "staff"
+        ? "Warehouse sign in"
+        : mode === "admin"
+          ? "Administrator sign in"
+          : "Welcome back";
 
   return (
     <main className="auth-page relative min-h-[calc(100svh-4rem)] overflow-hidden bg-slate-950 px-0 py-0 sm:px-6 sm:py-6 lg:px-10">
@@ -93,19 +168,30 @@ export const AuthView: React.FC<AuthViewProps> = ({
           </div>
           <div className="relative z-10 max-w-md">
             <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-blue-300">
-              One account. Every shipment.
+              {mode === "customer" ? "Customer account" : `${mode} portal`}
             </p>
             <h1 className="font-display text-4xl font-bold leading-tight">
-              Move business and life forward.
+              {mode === "admin"
+                ? "Keep every operation in view."
+                : mode === "rider"
+                  ? "Keep every delivery moving."
+                  : mode === "staff"
+                    ? "Keep every shipment moving."
+                    : "Move business and life forward."}
             </h1>
             <p className="mt-4 text-sm leading-7 text-slate-300">
-              Book pickups, follow deliveries, manage mailboxes, and keep every
-              receipt in one secure place.
+              {mode === "customer"
+                ? "Book pickups, follow deliveries, manage mailboxes, and keep every receipt in one secure place."
+                : mode === "rider"
+                  ? "Sign in to view your assigned pickups and update delivery progress."
+                  : mode === "staff"
+                    ? "Sign in to manage warehouse intake, pickups, services, and shipment updates."
+                    : "Sign in to oversee users, branches, pricing, and system activity."}
             </p>
           </div>
           <div className="relative z-10 flex items-center gap-2 text-xs text-slate-300">
             <ShieldCheck className="h-4 w-4 text-emerald-300" /> Secure
-            role-based access for every team.
+            role-based access.
           </div>
         </section>
 
@@ -136,104 +222,123 @@ export const AuthView: React.FC<AuthViewProps> = ({
             </button>
             <div className="mb-7">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
-                Account access
+                {mode === "customer" ? "Customer account" : `${mode} portal`}
               </span>
               <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-                {isSignUp && authRole === "customer"
+                {isSignUp && mode === "customer"
                   ? "Create your account"
-                  : "Welcome back"}
+                  : portalTitle}
               </h2>
               <p className="mt-2 text-sm text-slate-500">
-                {authRole === "customer"
-                  ? "Manage shipments, mailboxes, and receipts."
-                  : `Access your ${authRole} workspace.`}
+                {needsPasswordChange
+                  ? "Your temporary password must be changed before continuing."
+                  : mode === "customer"
+                    ? "Manage shipments, mailboxes, and receipts."
+                    : `Access the ${mode} workspace.`}
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 border border-slate-200 bg-slate-50 p-1.5 text-xs font-semibold">
-              {(["customer", "staff", "admin"] as const).map((role) => (
-                <button
-                  key={role}
-                  onClick={() => {
-                    setAuthRole(role);
-                    if (role !== "customer") setIsSignUp(false);
-                  }}
-                  className={`flex items-center justify-center gap-1.5 px-2 py-3 capitalize transition ${authRole === role ? "bg-white text-blue-700 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
-                >
-                  {role === "customer" ? (
-                    <User className="h-3.5 w-3.5" />
-                  ) : role === "staff" ? (
-                    <BriefcaseBusiness className="h-3.5 w-3.5" />
-                  ) : (
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                  )}
-                  {role}
-                </button>
-              ))}
-            </div>
-            <p className="mt-3 text-xs text-slate-400">
-              {authRole === "customer"
-                ? "Book shipments and manage your delivery history."
-                : authRole === "staff"
-                  ? "Manage assigned jobs and warehouse operations."
-                  : "Oversee users, branches, and system activity."}
-            </p>
-
-            <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-              {isSignUp && authRole === "customer" && (
+            {needsPasswordChange ? (
+              <form onSubmit={handlePasswordChange} className="mt-6 space-y-5">
                 <label className="block text-sm font-semibold text-slate-700">
-                  Full name
+                  New password
                   <input
-                    name="name"
+                    name="newPassword"
                     required
-                    type="text"
-                    placeholder="Your full name"
+                    minLength={12}
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="At least 12 characters"
                     className="auth-input bg-slate-50"
                   />
                 </label>
-              )}
-              <label className="block text-sm font-semibold text-slate-700">
-                Email address
-                <div className="relative">
-                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <label className="block text-sm font-semibold text-slate-700">
+                  Confirm new password
                   <input
-                    name="email"
+                    name="confirmPassword"
                     required
-                    type="email"
-                    placeholder="you@example.com"
-                    className="auth-input bg-slate-50 pl-10"
+                    minLength={12}
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="Enter it again"
+                    className="auth-input bg-slate-50"
                   />
-                </div>
-              </label>
-              <label className="block text-sm font-semibold text-slate-700">
-                Password
-                <input
-                  name="password"
-                  required
-                  type="password"
-                  placeholder="Enter your password"
-                  className="auth-input bg-slate-50"
-                />
-              </label>
-              {authError && (
-                <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {authError}
-                </p>
-              )}
-              <button
-                disabled={isSubmitting}
-                type="submit"
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:-translate-y-0.5 hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
-              >
-                <LockKeyhole className="h-4 w-4" />
-                {isSubmitting
-                  ? "Connecting..."
-                  : isSignUp && authRole === "customer"
-                    ? "Create account"
-                    : `Log in as ${authRole}`}
-              </button>
-            </form>
-            {authRole === "customer" && (
+                </label>
+                {authError && (
+                  <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {authError}
+                  </p>
+                )}
+                <button
+                  disabled={isSubmitting}
+                  type="submit"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <LockKeyhole className="h-4 w-4" />
+                  {isSubmitting
+                    ? "Updating password..."
+                    : "Change password and continue"}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+                {isSignUp && mode === "customer" && (
+                  <label className="block text-sm font-semibold text-slate-700">
+                    Full name
+                    <input
+                      name="name"
+                      required
+                      type="text"
+                      placeholder="Your full name"
+                      className="auth-input bg-slate-50"
+                    />
+                  </label>
+                )}
+                <label className="block text-sm font-semibold text-slate-700">
+                  Email address
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      name="email"
+                      required
+                      type="email"
+                      placeholder="you@example.com"
+                      className="auth-input bg-slate-50 pl-10"
+                    />
+                  </div>
+                </label>
+                <label className="block text-sm font-semibold text-slate-700">
+                  Password
+                  <input
+                    name="password"
+                    required
+                    type="password"
+                    placeholder="Enter your password"
+                    className="auth-input bg-slate-50"
+                  />
+                </label>
+                {authError && (
+                  <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {authError}
+                  </p>
+                )}
+                <button
+                  disabled={isSubmitting}
+                  type="submit"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:-translate-y-0.5 hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <LockKeyhole className="h-4 w-4" />
+                  {isSubmitting
+                    ? "Connecting..."
+                    : isSignUp
+                      ? "Create account"
+                      : mode === "customer"
+                        ? "Log in"
+                        : `Log in to ${mode} portal`}
+                </button>
+              </form>
+            )}
+            {mode === "customer" && (
               <button
                 onClick={() => setIsSignUp((value) => !value)}
                 className="mt-5 w-full text-center text-sm font-semibold text-blue-700 hover:text-blue-900"
@@ -244,8 +349,8 @@ export const AuthView: React.FC<AuthViewProps> = ({
               </button>
             )}
             <p className="mt-10 flex items-center justify-center gap-2 text-xs text-slate-400">
-              <User className="h-3.5 w-3.5" /> Your account connects every JB &
-              Best service.
+              <User className="h-3.5 w-3.5" /> Secure access for your JB & Best
+              account.
             </p>
           </div>
         </section>

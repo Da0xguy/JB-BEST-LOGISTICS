@@ -15,6 +15,7 @@ import {
   User,
   Search,
   ExternalLink,
+  History,
 } from "lucide-react";
 import {
   Shipment,
@@ -23,6 +24,8 @@ import {
   Carrier,
   ShipmentStatus,
 } from "../../types";
+import { WarehouseMailboxView } from "./WarehouseMailboxView";
+import { WarehouseHistoryView } from "./WarehouseHistoryView";
 
 interface StaffDashboardProps {
   shipments: Shipment[];
@@ -32,8 +35,6 @@ interface StaffDashboardProps {
   onUpdateShipment: (shipment: Shipment) => void;
   onUpdatePickup: (pickup: PickupRequest) => void;
   onUpdateAppointment?: (appointment: Appointment) => void;
-  onSwitchToConsumer: () => void;
-  onSwitchToAdmin: () => void;
 }
 
 export const StaffDashboard: React.FC<StaffDashboardProps> = ({
@@ -44,11 +45,15 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   onUpdateShipment,
   onUpdatePickup,
   onUpdateAppointment,
-  onSwitchToConsumer,
-  onSwitchToAdmin,
 }) => {
   const [activeStaffTab, setActiveStaffTab] = useState<
-    "intake" | "pickups" | "scanner" | "appointments" | "manifest"
+    | "intake"
+    | "pickups"
+    | "scanner"
+    | "appointments"
+    | "manifest"
+    | "mailboxes"
+    | "history"
   >("intake");
 
   // Intake state
@@ -378,40 +383,14 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
-      {/* Staff Header Banner */}
-      <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-1.5">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/10 text-amber-400 text-xs font-semibold border border-amber-400/20">
-            <Truck className="w-3.5 h-3.5" />
-            <span>Store Counter & Dispatch Console</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-display font-bold text-white tracking-tight">
-            Staff Operations Terminal
-          </h2>
-          <p className="text-sm text-slate-400 max-w-2xl">
-            Counter package intake, thermal label printing, driver dispatch
-            assignments, and live tracking milestone updates.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <button
-            onClick={onSwitchToAdmin}
-            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition cursor-pointer flex items-center gap-1.5"
-          >
-            <Shield className="w-3.5 h-3.5 text-blue-400" />
-            <span>Switch to Admin Console</span>
-          </button>
-          <button
-            onClick={onSwitchToConsumer}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition cursor-pointer flex items-center gap-1.5 shadow-sm"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>View Public Storefront</span>
-          </button>
-        </div>
-      </div>
-
+      <header>
+        <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
+          Warehouse workspace
+        </p>
+        <h1 className="mt-1 text-2xl font-bold text-gray-900">
+          Warehouse operations
+        </h1>
+      </header>
       {/* Staff Operational Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-gray-200 overflow-x-auto pb-px">
         {[
@@ -428,6 +407,8 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
             icon: Calendar,
           },
           { id: "manifest", label: "5:30 PM Carrier Manifest", icon: Clock },
+          { id: "mailboxes", label: "Mailbox Profiles", icon: User },
+          { id: "history", label: "History", icon: History },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeStaffTab === tab.id;
@@ -447,6 +428,9 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
           );
         })}
       </div>
+
+      {activeStaffTab === "mailboxes" && <WarehouseMailboxView />}
+      {activeStaffTab === "history" && <WarehouseHistoryView />}
 
       {/* TAB 1: Counter Intake */}
       {activeStaffTab === "intake" && (

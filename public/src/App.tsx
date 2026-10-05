@@ -7,9 +7,12 @@ import { AppointmentBookingView } from "./components/AppointmentBookingView";
 import { PickupSchedulerView } from "./components/PickupSchedulerView";
 import { InvoiceReceiptView } from "./components/InvoiceReceiptView";
 import { StaffDashboard } from "./components/staff/StaffDashboard";
+import { RiderDashboard } from "./components/RiderDashboard";
 import { AdminDashboard } from "./components/admin/AdminDashboard";
 import { ArchitectureModal } from "./components/ArchitectureModal";
 import { AuthView } from "./components/AuthView";
+import { CustomerProfileView } from "./components/CustomerProfileView";
+import { getCurrentUser, getCustomerProfile, CustomerProfile } from "./lib/api";
 import {
   INITIAL_SHIPMENTS,
   INITIAL_INVOICES,
@@ -140,14 +143,101 @@ function ToastHost({
 }
 
 export default function App() {
-  const [portal, setPortal] = useState<"consumer" | "staff" | "admin">(
-    "consumer",
+  const [pathname, setPathname] = useState(window.location.pathname);
+  const [portalAccess, setPortalAccess] = useState<"checking" | "allowed">(
+    "checking",
   );
+  const portalMode = pathname.startsWith("/rider")
+    ? "rider"
+    : pathname.startsWith("/staff")
+      ? "staff"
+      : pathname.startsWith("/admin")
+        ? "admin"
+        : null;
+  const portal =
+    pathname === "/staff"
+      ? "staff"
+      : pathname === "/admin"
+        ? "admin"
+        : "consumer";
   const [activeTab, setActiveTab] = useState<string>("services");
   const [userRole, setUserRole] = useState<UserRole>("customer");
+  const [customerProfile, setCustomerProfile] =
+    useState<CustomerProfile | null>(null);
   const [isArchitectureOpen, setIsArchitectureOpen] = useState<boolean>(false);
   const [heroSearch, setHeroSearch] = useState<string>("");
   const [isAuthPageOpen, setIsAuthPageOpen] = useState(false);
+
+  const routeTo = (path: string) => {
+    window.history.pushState({}, "", path);
+    setPathname(path);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const setPortal = (target: "consumer" | "staff" | "admin") => {
+    routeTo(target === "consumer" ? "/" : `/${target}/login`);
+  };
+
+  useEffect(() => {
+    const handlePopState = () => setPathname(window.location.pathname);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (pathname !== "/" || !localStorage.getItem("jb_best_token")) return;
+    let isCurrent = true;
+    const loadCustomerProfile = async () => {
+      try {
+        const { user } = await getCurrentUser();
+        if (!isCurrent || user.role !== "customer") return;
+        const { profile, mailboxes } = await getCustomerProfile();
+        if (isCurrent) setCustomerProfile({ ...profile, mailboxes });
+      } catch {}
+    };
+    void loadCustomerProfile();
+    return () => {
+      isCurrent = false;
+    };
+  }, [pathname]);
+
+  useEffect(() => {
+    if (pathname !== "/rider" && pathname !== "/staff" && pathname !== "/admin")
+      return;
+    let isCurrent = true;
+    const expectedPortal =
+      pathname === "/rider"
+        ? "rider"
+        : pathname === "/staff"
+          ? "staff"
+          : "admin";
+    setPortalAccess("checking");
+
+    const redirectToLogin = () => {
+      if (!isCurrent) return;
+      localStorage.removeItem("jb_best_token");
+      const loginPath = `/${expectedPortal}/login`;
+      window.history.replaceState({}, "", loginPath);
+      setPathname(loginPath);
+    };
+
+    getCurrentUser()
+      .then(({ user }) => {
+        if (!isCurrent) return;
+        const hasAccess =
+          expectedPortal === "admin"
+            ? user.role === "admin"
+            : expectedPortal === "rider"
+              ? user.role === "rider"
+              : ["warehouse", "warehouse_staff"].includes(user.role);
+        if (hasAccess) setPortalAccess("allowed");
+        else redirectToLogin();
+      })
+      .catch(redirectToLogin);
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [pathname]);
 
   // Application State
   const [shipments, setShipments] = useState<Shipment[]>(INITIAL_SHIPMENTS);
@@ -339,6 +429,92 @@ export default function App() {
     handleQuickTrack(heroSearch);
   };
 
+  if (portalMode) {
+    const isLoginPage = pathname === `/${portalMode}/login`;
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-800">
+        <ToastHost toasts={toasts} onClose={removeToast} />
+        {isLoginPage ? (
+          <AuthView
+            key={portalMode}
+            mode={portalMode}
+            onBack={() => routeTo("/")}
+            setPortal={setPortal}
+            setUserRole={setUserRole}
+            onAuthenticated={(_mode, role) =>
+              routeTo(
+                role === "rider"
+                  ? "/rider"
+                  : role === "admin"
+                    ? "/admin"
+                    : "/staff",
+              )
+            }
+          />
+        ) : portalAccess === "allowed" ? (
+          <>
+            <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-8">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white">
+                  <Package className="h-5 w-5" />
+                </span>
+                <span className="font-display font-bold text-slate-900">
+                  JB & Best Logistics
+                </span>
+                <span className="border-l border-slate-200 pl-3 text-sm font-semibold capitalize text-slate-500">
+                  {portalMode === "staff" ? "warehouse" : portalMode} portal
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem("jb_best_token");
+                  setUserRole("customer");
+                  routeTo(`/${portalMode}/login`);
+                }}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Sign out
+              </button>
+            </header>
+            <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+              {portalMode === "rider" ? (
+                <RiderDashboard />
+              ) : portalMode === "staff" ? (
+                <StaffDashboard
+                  shipments={shipments}
+                  pickups={pickups}
+                  appointments={appointments}
+                  onAddShipment={handleAddShipment}
+                  onUpdateShipment={handleUpdateShipment}
+                  onUpdatePickup={handleUpdatePickup}
+                  onUpdateAppointment={handleUpdateAppointment}
+                />
+              ) : (
+                <AdminDashboard
+                  shipments={shipments}
+                  invoices={invoices}
+                  appointments={appointments}
+                  pickups={pickups}
+                  onUpdateInvoice={handleUpdateInvoice}
+                  onOpenArchitecture={() => setIsArchitectureOpen(true)}
+                />
+              )}
+            </main>
+          </>
+        ) : (
+          <main className="flex min-h-screen items-center justify-center px-4 text-sm font-semibold text-slate-600">
+            Checking portal access...
+          </main>
+        )}
+        <ArchitectureModal
+          isOpen={portalMode === "admin" && isArchitectureOpen}
+          onClose={() => setIsArchitectureOpen(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
       <ToastHost toasts={toasts} onClose={removeToast} />
@@ -364,6 +540,23 @@ export default function App() {
           onBack={() => setIsAuthPageOpen(false)}
           setPortal={setPortal}
           setUserRole={setUserRole}
+          onAuthenticated={(_mode, role) => {
+            setUserRole(
+              role === "customer"
+                ? "customer"
+                : role === "admin"
+                  ? "admin"
+                  : "associate",
+            );
+            setIsAuthPageOpen(false);
+            if (role === "customer") {
+              void getCustomerProfile()
+                .then(({ profile, mailboxes }) =>
+                  setCustomerProfile({ ...profile, mailboxes }),
+                )
+                .catch(() => {});
+            }
+          }}
         />
       )}
 
@@ -388,8 +581,6 @@ export default function App() {
               onUpdateShipment={handleUpdateShipment}
               onUpdatePickup={handleUpdatePickup}
               onUpdateAppointment={handleUpdateAppointment}
-              onSwitchToConsumer={() => setPortal("consumer")}
-              onSwitchToAdmin={() => setPortal("admin")}
             />
           )}
 
@@ -404,8 +595,6 @@ export default function App() {
               pickups={pickups}
               onUpdateInvoice={handleUpdateInvoice}
               onOpenArchitecture={() => setIsArchitectureOpen(true)}
-              onSwitchToConsumer={() => setPortal("consumer")}
-              onSwitchToStaff={() => setPortal("staff")}
             />
           )}
 
@@ -562,6 +751,7 @@ export default function App() {
                     appointments={appointments}
                     onAddAppointment={handleAddAppointment}
                     onNotify={showToast}
+                    profile={customerProfile}
                   />
                 )}
 
@@ -570,6 +760,7 @@ export default function App() {
                     pickups={pickups}
                     onAddPickup={handleAddPickup}
                     onNotify={showToast}
+                    profile={customerProfile}
                   />
                 )}
 
@@ -583,6 +774,12 @@ export default function App() {
             </>
           )}
         </main>
+      )}
+      {activeTab === "profile" && (
+        <CustomerProfileView
+          onProfileSaved={setCustomerProfile}
+          onOpenAuth={() => setIsAuthPageOpen(true)}
+        />
       )}
 
       {/* Clean, Approachable Consumer Footer */}
@@ -616,7 +813,6 @@ export default function App() {
                 </span>
               </div>
             </div>
-
             {/* Column 2: Quick Links */}
             <div className="space-y-2.5 text-sm">
               <h4 className="font-semibold text-gray-900">Services</h4>
@@ -671,7 +867,6 @@ export default function App() {
                 </li>
               </ul>
             </div>
-
             {/* Column 3: Store Hours */}
             <div className="space-y-2.5 text-sm">
               <h4 className="font-semibold text-gray-900">Store Hours</h4>
@@ -697,50 +892,10 @@ export default function App() {
                 </p>
               </div>
             </div>
-
-            {/* Column 4: Location & Portals */}
+            {/* Column 4: Store Location */}
             <div className="space-y-2.5 text-sm">
-              <h4 className="font-semibold text-gray-900">Role Dashboards</h4>
-              <ul className="space-y-2 text-xs sm:text-sm">
-                <li>
-                  <button
-                    onClick={() => {
-                      setPortal("consumer");
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className={`flex items-center gap-1.5 transition cursor-pointer ${portal === "consumer" ? "text-blue-600 font-bold" : "text-gray-500 hover:text-blue-600"}`}
-                  >
-                    <Store className="w-3.5 h-3.5" />
-                    <span>Consumer Storefront</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => {
-                      setPortal("staff");
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className={`flex items-center gap-1.5 transition cursor-pointer ${portal === "staff" ? "text-amber-600 font-bold" : "text-gray-500 hover:text-amber-600"}`}
-                  >
-                    <Truck className="w-3.5 h-3.5" />
-                    <span>Staff Operations Portal</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => {
-                      setPortal("admin");
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className={`flex items-center gap-1.5 transition cursor-pointer ${portal === "admin" ? "text-slate-900 font-bold" : "text-gray-500 hover:text-slate-900"}`}
-                  >
-                    <Shield className="w-3.5 h-3.5" />
-                    <span>Admin Executive Console</span>
-                  </button>
-                </li>
-              </ul>
-
-              <div className="pt-2 text-xs text-gray-500">
+              <h4 className="font-semibold text-gray-900">Visit or call</h4>
+              <div className="space-y-1 pt-1 text-xs text-gray-500">
                 <p>📍 2450 Piedmont Rd NE, Atlanta GA</p>
                 <p>📞 (404) 555-0199</p>
               </div>
