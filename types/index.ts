@@ -23,7 +23,9 @@ export type Carrier = 'fedex' | 'ups' | 'usps' | 'dhl' | 'jb_freight';
 
 export type ShipmentStatus =
   | 'order_created'
+  | 'assigned'
   | 'picked_up'
+  | 'at_warehouse'
   | 'in_transit'
   | 'out_for_delivery'
   | 'delivered'

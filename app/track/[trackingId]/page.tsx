@@ -18,15 +18,19 @@ interface PageProps {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 const MILESTONES: { status: ShipmentStatus; label: string }[] = [
   { status: "order_created", label: "Order created" },
+  { status: "assigned", label: "Rider assigned" },
   { status: "picked_up", label: "Picked up" },
+  { status: "at_warehouse", label: "At warehouse" },
   { status: "in_transit", label: "In transit" },
   { status: "out_for_delivery", label: "Out for delivery" },
   { status: "delivered", label: "Delivered" },
 ];
 
 const mapStatus = (status: string): ShipmentStatus => {
+  if (status === "assigned") return "assigned";
   if (status === "picked_up") return "picked_up";
-  if (status === "at_warehouse" || status === "in_transit") return "in_transit";
+  if (status === "at_warehouse") return "at_warehouse";
+  if (status === "in_transit") return "in_transit";
   if (status === "out_for_delivery") return "out_for_delivery";
   if (status === "delivered") return "delivered";
   if (status === "exception" || status === "cancelled") return "exception";
@@ -259,7 +263,7 @@ export default function TrackingPage({ params }: PageProps) {
             </div>
           </div>
 
-          <div className="mt-8 grid grid-cols-5 gap-2">
+          <div className="mt-8 grid grid-cols-3 gap-3 sm:grid-cols-7">
             {MILESTONES.map((milestone, index) => (
               <div key={milestone.status} className="text-center">
                 <div

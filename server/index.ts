@@ -262,13 +262,21 @@ app.patch('/api/shipments/:id/status', requireAuth, allowRoles('rider', 'warehou
   const shipment = await Shipment.findOneAndUpdate(shipmentFilter, { status, ...(status === 'delivered' ? { deliveredAt: new Date() } : {}), $push: { events: event, tracking_history: event } }, { new: true });
   if (!shipment) return res.status(404).json({ error: 'Shipment not found' });
   await logActivity(req, 'status_update', 'shipment', shipment.id, { status });
-  await Notification.create({ userId: shipment.customerId, shipmentId: shipment._id, channel: 'in_app', title: 'Shipment update', body: `Shipment ${shipment.trackingId} is now ${status.replaceAll('_', ' ')}.` });
-  if (['delivered', 'cancelled'].includes(status) && shipment.assignedRiderId) {
+  await Notification.create({
+    userId: shipment.customerId,
+    shipmentId: shipment._id,
+    channel: 'in_app',
+    title: status === 'at_warehouse' ? 'Shipment received at warehouse' : 'Shipment update',
+    body: status === 'at_warehouse'
+      ? `Shipment ${shipment.trackingId} is at the warehouse and waiting for outbound shipping.`
+      : `Shipment ${shipment.trackingId} is now ${status.replaceAll('_', ' ')}.`,
+  });
+  if (['at_warehouse', 'delivered', 'cancelled'].includes(status) && shipment.assignedRiderId) {
     await Promise.all([
       RiderProfile.updateOne({ userId: shipment.assignedRiderId }, { $set: { is_assigned: false } }),
       PickupJob.updateMany(
         { shipmentId: shipment._id, riderId: shipment.assignedRiderId, status: { $in: ['assigned', 'in_route'] } },
-        { $set: { status: status === 'delivered' ? 'completed' : 'failed' } },
+        { $set: { status: status === 'cancelled' ? 'failed' : 'completed' } },
       ),
     ]);
     void dispatchQueuedShipments().catch((error: unknown) => console.error('Queued dispatch retry failed', error));

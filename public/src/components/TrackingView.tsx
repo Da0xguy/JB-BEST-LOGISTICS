@@ -37,9 +37,19 @@ const MILESTONES: {
     description: "Label printed & verified",
   },
   {
+    status: "assigned",
+    label: "Rider Assigned",
+    description: "Pickup accepted by rider",
+  },
+  {
     status: "picked_up",
     label: "Picked Up",
     description: "Loaded at origin facility",
+  },
+  {
+    status: "at_warehouse",
+    label: "At Warehouse",
+    description: "Received and awaiting outbound shipping",
   },
   {
     status: "in_transit",
@@ -119,6 +129,7 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
     const order: ShipmentStatus[] = [
       "order_created",
       "picked_up",
+      "at_warehouse",
       "in_transit",
       "out_for_delivery",
       "delivered",
@@ -327,7 +338,7 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
 
             {/* Visual Stepper */}
             <div className="pt-8">
-              <div className="grid grid-cols-5 gap-2 relative">
+              <div className="relative grid grid-cols-3 gap-3 sm:grid-cols-7">
                 {/* Background Connecting Line */}
                 <div className="absolute top-4 left-[10%] right-[10%] h-1 bg-gray-100 -z-0" />
                 <div

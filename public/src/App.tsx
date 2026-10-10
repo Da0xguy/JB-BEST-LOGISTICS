@@ -14,6 +14,8 @@ import { AuthView } from "./components/AuthView";
 import { CustomerProfileView } from "./components/CustomerProfileView";
 import {
   getCurrentUser,
+  getAuthToken,
+  clearAuthToken,
   getCustomerProfile,
   listCustomerShipments,
   listOperationalPickups,
@@ -185,7 +187,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (pathname !== "/" || !localStorage.getItem("jb_best_token")) return;
+    if (pathname !== "/" || !getAuthToken()) return;
     let isCurrent = true;
     const loadCustomerProfile = async () => {
       try {
@@ -224,7 +226,7 @@ export default function App() {
 
     const redirectToLogin = () => {
       if (!isCurrent) return;
-      localStorage.removeItem("jb_best_token");
+      clearAuthToken();
       const loginPath = `/${expectedPortal}/login`;
       window.history.replaceState({}, "", loginPath);
       setPathname(loginPath);
@@ -287,12 +289,7 @@ export default function App() {
   }, [pathname, portalAccess]);
 
   useEffect(() => {
-    if (
-      pathname !== "/" ||
-      !customerProfile ||
-      !localStorage.getItem("jb_best_token")
-    )
-      return;
+    if (pathname !== "/" || !customerProfile || !getAuthToken()) return;
     let isCurrent = true;
     const refreshShipments = async () => {
       try {
@@ -543,7 +540,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  localStorage.removeItem("jb_best_token");
+                  clearAuthToken();
                   setUserRole("customer");
                   routeTo(`/${portalMode}/login`);
                 }}

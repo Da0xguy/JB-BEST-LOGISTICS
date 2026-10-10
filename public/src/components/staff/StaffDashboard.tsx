@@ -17,6 +17,7 @@ import {
   ExternalLink,
   History,
 } from "lucide-react";
+import { apiRequest, getShipmentByTrackingNumber } from "../../lib/api";
 import {
   Shipment,
   PickupRequest,
@@ -26,6 +27,7 @@ import {
 } from "../../types";
 import { WarehouseMailboxView } from "./WarehouseMailboxView";
 import { WarehouseHistoryView } from "./WarehouseHistoryView";
+import { extractTrackingId, QrCameraScanner } from "../QrCameraScanner";
 
 interface StaffDashboardProps {
   shipments: Shipment[];
@@ -67,12 +69,15 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   const [intakeSuccess, setIntakeSuccess] = useState<string | null>(null);
 
   // Scanner state
-  const [selectedShipmentId, setSelectedShipmentId] = useState<string>(
-    shipments[0]?.id || "",
-  );
   const [selectedPickupId, setSelectedPickupId] = useState<string>(
     pickups[0]?.id || "",
   );
+  const [trackingIdInput, setTrackingIdInput] = useState("");
+  const [scannedShipment, setScannedShipment] = useState<Shipment | null>(null);
+  const [warehouseScannerOpen, setWarehouseScannerOpen] = useState(false);
+  const [scanBusy, setScanBusy] = useState(false);
+  const [scanError, setScanError] = useState("");
+  const [scanNotice, setScanNotice] = useState("");
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string>(
     appointments[0]?.id || "",
   );
@@ -80,15 +85,6 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
     kind: "intake" | "appointment";
     appointmentId?: string;
   }>(null);
-  const [milestoneStatus, setMilestoneStatus] =
-    useState<ShipmentStatus>("in_transit");
-  const [milestoneTitle, setMilestoneTitle] = useState(
-    "Linehaul Transit Departure",
-  );
-  const [milestoneCity, setMilestoneCity] = useState("Atlanta, GA");
-  const [milestoneDesc, setMilestoneDesc] = useState(
-    "Departed sort facility en route to destination.",
-  );
 
   const printShipmentLabel = (shipment: Shipment | null | undefined) => {
     if (!shipment) return;
@@ -337,39 +333,111 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
     }
   };
 
-  const handleAddMilestone = (e: React.FormEvent) => {
-    e.preventDefault();
-    const shipment = shipments.find((s) => s.id === selectedShipmentId);
-    if (!shipment) return;
+  const getShipmentRoute = (shipment: Shipment) => {
+    if (
+      shipment.sender.country.toLowerCase() !==
+      shipment.recipient.country.toLowerCase()
+    )
+      return "International";
+    if (
+      shipment.sender.state.toLowerCase() !==
+      shipment.recipient.state.toLowerCase()
+    )
+      return "Interstate";
+    return "In-state";
+  };
 
-    const newLog = {
-      id: `log-${Date.now()}`,
-      shipmentId: shipment.id,
-      status: milestoneStatus,
-      title: milestoneTitle,
-      description: milestoneDesc,
-      location: {
-        city: milestoneCity.split(",")[0]?.trim() || "Atlanta",
-        state: milestoneCity.split(",")[1]?.trim() || "GA",
-        country: "USA",
-        latitude: shipment.currentLocation.latitude,
-        longitude: shipment.currentLocation.longitude,
-        facilityName: "Carrier Checkpoint",
-      },
-      timestamp: new Date().toISOString(),
-    };
+  const handleWarehouseScan = async (payload: string) => {
+    setWarehouseScannerOpen(false);
+    setScanError("");
+    setScanNotice("");
+    setScanBusy(true);
+    try {
+      const trackingId = extractTrackingId(payload);
+      const shipment = await getShipmentByTrackingNumber(trackingId);
+      const route = getShipmentRoute(shipment);
+      setScannedShipment(shipment);
+      if (
+        shipment.currentStatus !== "assigned" &&
+        shipment.currentStatus !== "picked_up" &&
+        shipment.currentStatus !== "at_warehouse"
+      ) {
+        throw new Error(
+          `Shipment is ${shipment.currentStatus.replaceAll("_", " ")}; warehouse intake is not available at this stage.`,
+        );
+      }
+      if (shipment.currentStatus !== "at_warehouse") {
+        const note = `Received at warehouse and waiting for ${route.toLowerCase()} outbound shipping.`;
+        await apiRequest(
+          `/api/shipments/${encodeURIComponent(shipment.id)}/status`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ status: "at_warehouse", note }),
+          },
+        );
+        const receivedShipment = {
+          ...shipment,
+          currentStatus: "at_warehouse" as const,
+          updatedAt: new Date().toISOString(),
+        };
+        setScannedShipment(receivedShipment);
+        onUpdateShipment(receivedShipment);
+        setScanNotice(
+          `${trackingId} received. The customer was notified that it is at the warehouse awaiting ${route.toLowerCase()} shipping.`,
+        );
+      } else {
+        setScanNotice(
+          `${trackingId} is already received and awaiting ${route.toLowerCase()} shipping.`,
+        );
+      }
+      setTrackingIdInput("");
+    } catch (scanFailure) {
+      setScanError(
+        scanFailure instanceof Error
+          ? scanFailure.message
+          : "Unable to receive this shipment.",
+      );
+    } finally {
+      setScanBusy(false);
+    }
+  };
 
-    const updatedShipment: Shipment = {
-      ...shipment,
-      currentStatus: milestoneStatus,
-      updatedAt: new Date().toISOString(),
-      trackingLogs: [newLog, ...shipment.trackingLogs],
-    };
-
-    onUpdateShipment(updatedShipment);
-    alert(
-      `Added milestone update to ${shipment.trackingNumber}! Check customer tracking view to see the live update.`,
-    );
+  const markScannedShipmentOutbound = async () => {
+    if (!scannedShipment || scannedShipment.currentStatus !== "at_warehouse")
+      return;
+    setScanBusy(true);
+    setScanError("");
+    try {
+      const route = getShipmentRoute(scannedShipment);
+      await apiRequest(
+        `/api/shipments/${encodeURIComponent(scannedShipment.id)}/status`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            status: "in_transit",
+            note: `Dispatched from warehouse for ${route.toLowerCase()} shipping.`,
+          }),
+        },
+      );
+      const dispatchedShipment = {
+        ...scannedShipment,
+        currentStatus: "in_transit" as const,
+        updatedAt: new Date().toISOString(),
+      };
+      setScannedShipment(dispatchedShipment);
+      onUpdateShipment(dispatchedShipment);
+      setScanNotice(
+        `${scannedShipment.trackingNumber} marked in transit for ${route.toLowerCase()} shipping.`,
+      );
+    } catch (dispatchError) {
+      setScanError(
+        dispatchError instanceof Error
+          ? dispatchError.message
+          : "Unable to mark shipment outbound.",
+      );
+    } finally {
+      setScanBusy(false);
+    }
   };
 
   return (
@@ -757,105 +825,111 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
 
       {/* TAB 3: Milestone Scanner */}
       {activeStaffTab === "scanner" && (
-        <div className="bg-white rounded-3xl border border-gray-200/80 p-6 sm:p-8 shadow-xs space-y-6">
-          <div>
+        <div className="space-y-5 rounded-xl border border-gray-200 bg-white p-5 sm:p-7">
+          <header>
             <h3 className="text-lg font-bold text-gray-900">
-              Waypoint & Milestone Scanner
+              Warehouse intake scanner
             </h3>
-            <p className="text-xs text-gray-500">
-              Update package status milestones. Changes appear instantaneously
-              in the customer&apos;s live tracking view.
+            <p className="mt-1 text-sm text-gray-600">
+              Scan a rider handoff to record warehouse receipt. The customer is
+              notified while the parcel waits for outbound shipping.
             </p>
-          </div>
+          </header>
 
-          <form
-            onSubmit={handleAddMilestone}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm"
-          >
-            <div>
-              <label className="block text-gray-700 font-semibold mb-1">
-                Select Package
-              </label>
-              <select
-                value={selectedShipmentId}
-                onChange={(e) => setSelectedShipmentId(e.target.value)}
-                className="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none"
-              >
-                {shipments.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.trackingNumber} ({s.carrier.toUpperCase()} to{" "}
-                    {s.recipient.city})
-                  </option>
-                ))}
-              </select>
-            </div>
+          {scanError && (
+            <p
+              role="alert"
+              className="border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+            >
+              {scanError}
+            </p>
+          )}
+          {scanNotice && (
+            <p
+              role="status"
+              className="border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
+            >
+              {scanNotice}
+            </p>
+          )}
 
-            <div>
-              <label className="block text-gray-700 font-semibold mb-1">
-                Milestone Status
-              </label>
-              <select
-                value={milestoneStatus}
-                onChange={(e) =>
-                  setMilestoneStatus(e.target.value as ShipmentStatus)
-                }
-                className="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none"
-              >
-                <option value="picked_up">Picked Up by Carrier</option>
-                <option value="in_transit">
-                  In Transit / Intermediate Sort
-                </option>
-                <option value="out_for_delivery">Out for Delivery</option>
-                <option value="delivered">Delivered to Recipient</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-gray-700 font-semibold mb-1">
-                Milestone Headline
-              </label>
-              <input
-                type="text"
-                value={milestoneTitle}
-                onChange={(e) => setMilestoneTitle(e.target.value)}
-                className="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-gray-700 font-semibold mb-1">
-                Checkpoint Location
-              </label>
-              <input
-                type="text"
-                value={milestoneCity}
-                onChange={(e) => setMilestoneCity(e.target.value)}
-                className="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none"
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block text-gray-700 font-semibold mb-1">
-                Status Description
-              </label>
-              <input
-                type="text"
-                value={milestoneDesc}
-                onChange={(e) => setMilestoneDesc(e.target.value)}
-                className="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none"
-              />
-            </div>
-
-            <div className="sm:col-span-2 pt-2">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <section className="space-y-3">
               <button
-                type="submit"
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
+                type="button"
+                onClick={() => setWarehouseScannerOpen((open) => !open)}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
-                <Send className="w-4 h-4" />
-                <span>Publish Tracking Update to Customer View</span>
+                <QrCode className="h-4 w-4" />{" "}
+                {warehouseScannerOpen ? "Close camera" : "Open camera scanner"}
               </button>
-            </div>
-          </form>
+              {warehouseScannerOpen && (
+                <QrCameraScanner
+                  onScan={(value) => void handleWarehouseScan(value)}
+                  onClose={() => setWarehouseScannerOpen(false)}
+                />
+              )}
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void handleWarehouseScan(trackingIdInput);
+                }}
+                className="flex flex-col gap-2 sm:flex-row"
+              >
+                <input
+                  value={trackingIdInput}
+                  onChange={(event) => setTrackingIdInput(event.target.value)}
+                  placeholder="Or enter tracking ID"
+                  aria-label="Shipment tracking ID"
+                  className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+                <button
+                  type="submit"
+                  disabled={scanBusy}
+                  className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
+                >
+                  {scanBusy ? "Checking..." : "Receive parcel"}
+                </button>
+              </form>
+            </section>
+
+            {scannedShipment ? (
+              <section className="space-y-3 border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="font-mono text-sm font-bold text-gray-900">
+                    {scannedShipment.trackingNumber}
+                  </h4>
+                  <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold capitalize text-blue-800">
+                    {scannedShipment.currentStatus.replaceAll("_", " ")}
+                  </span>
+                </div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {getShipmentRoute(scannedShipment)} route · To{" "}
+                  {scannedShipment.recipient.city},{" "}
+                  {scannedShipment.recipient.state},{" "}
+                  {scannedShipment.recipient.country}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {scannedShipment.recipient.name} ·{" "}
+                  {scannedShipment.recipient.street}
+                </p>
+                {scannedShipment.currentStatus === "at_warehouse" && (
+                  <button
+                    type="button"
+                    onClick={() => void markScannedShipmentOutbound()}
+                    disabled={scanBusy}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+                  >
+                    <Send className="h-4 w-4" /> Mark outbound shipment
+                  </button>
+                )}
+              </section>
+            ) : (
+              <div className="flex min-h-32 items-center justify-center border border-dashed border-gray-300 p-5 text-center text-sm text-gray-500">
+                Scan a parcel to view its route and warehouse status.
+              </div>
+            )}
+          </div>
         </div>
       )}
 

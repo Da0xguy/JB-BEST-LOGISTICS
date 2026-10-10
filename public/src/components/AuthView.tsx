@@ -8,7 +8,13 @@ import {
   User,
   X,
 } from "lucide-react";
-import { changePassword, login, register } from "../lib/api";
+import {
+  changePassword,
+  clearAuthToken,
+  login,
+  register,
+  setAuthToken,
+} from "../lib/api";
 import { AuthRole } from "../lib/api";
 
 type AuthMode = "customer" | "rider" | "staff" | "admin";
@@ -67,7 +73,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
     setAuthError("");
     setIsSubmitting(true);
     const form = new FormData(event.currentTarget);
-    localStorage.removeItem("jb_best_token");
+    clearAuthToken();
 
     try {
       const response =
@@ -91,7 +97,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
       if (!allowed)
         throw new Error(`This account cannot access the ${mode} portal.`);
 
-      localStorage.setItem("jb_best_token", response.token);
+      setAuthToken(response.token);
       if (response.user.mustChangePassword) {
         setNeedsPasswordChange(true);
         return;

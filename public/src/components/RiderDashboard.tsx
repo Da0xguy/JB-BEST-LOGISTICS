@@ -1,9 +1,21 @@
 import React, { useEffect, useState } from "react";
-import { Check, MapPin, PackageCheck, RefreshCw, Truck } from "lucide-react";
+import QRCode from "qrcode";
+import {
+  Check,
+  MapPin,
+  PackageCheck,
+  Printer,
+  QrCode,
+  RefreshCw,
+  Truck,
+} from "lucide-react";
+import { QrCameraScanner, extractTrackingId } from "./QrCameraScanner";
 import {
   ApiError,
   acceptRiderOffer,
   apiRequest,
+  clearAuthToken,
+  getShipmentByTrackingNumber,
   getRiderProfile,
   listRiderOffers,
   RiderDispatchOffer,
@@ -14,6 +26,7 @@ import {
 type RiderShipmentStatus =
   | "assigned"
   | "picked_up"
+  | "at_warehouse"
   | "in_transit"
   | "out_for_delivery"
   | "delivered"
@@ -29,6 +42,7 @@ interface RiderShipment {
     street: string;
     city: string;
     state?: string;
+    country?: string;
     phone: string;
   };
   receiver: {
@@ -36,6 +50,7 @@ interface RiderShipment {
     street: string;
     city: string;
     state?: string;
+    country?: string;
     phone: string;
   };
 }
@@ -57,6 +72,7 @@ const NEXT_STATUS: Partial<Record<RiderShipmentStatus, RiderShipmentStatus>> = {
 const STATUS_LABEL: Record<RiderShipmentStatus, string> = {
   assigned: "Assigned",
   picked_up: "Picked up",
+  at_warehouse: "At warehouse",
   in_transit: "In transit",
   out_for_delivery: "Out for delivery",
   delivered: "Delivered",
@@ -75,6 +91,9 @@ export const RiderDashboard: React.FC = () => {
   const [offersError, setOffersError] = useState("");
   const [offersPollingEnabled, setOffersPollingEnabled] = useState(true);
   const [error, setError] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [trackingIdInput, setTrackingIdInput] = useState("");
+  const [scanNotice, setScanNotice] = useState("");
 
   const redirectUnauthorizedRider = (requestError: unknown) => {
     if (
@@ -82,7 +101,7 @@ export const RiderDashboard: React.FC = () => {
       ![401, 403].includes(requestError.status)
     )
       return false;
-    localStorage.removeItem("jb_best_token");
+    clearAuthToken();
     window.location.replace("/rider/login");
     return true;
   };
@@ -231,10 +250,88 @@ export const RiderDashboard: React.FC = () => {
     }
   };
 
+  const handleRiderScan = async (payload: string) => {
+    setScannerOpen(false);
+    setError("");
+    setScanNotice("");
+    try {
+      const trackingId = extractTrackingId(payload);
+      const shipment = await getShipmentByTrackingNumber(trackingId);
+      const assignedJob = jobs.find(
+        (job) => job.shipmentId?._id === shipment.id,
+      );
+      if (!assignedJob?.shipmentId) {
+        throw new Error("This shipment is not assigned to your rider account.");
+      }
+
+      if (shipment.currentStatus === "picked_up") {
+        const needsWarehouse =
+          shipment.sender.country.trim().toLowerCase() !==
+            shipment.recipient.country.trim().toLowerCase() ||
+          shipment.sender.state.trim().toLowerCase() !==
+            shipment.recipient.state.trim().toLowerCase();
+        if (needsWarehouse) {
+          throw new Error(
+            "Take this shipment to the warehouse. Staff will scan receipt before outbound shipping.",
+          );
+        }
+      }
+
+      const nextStatus =
+        NEXT_STATUS[shipment.currentStatus as RiderShipmentStatus];
+      if (!nextStatus)
+        throw new Error("This shipment has no rider scan action remaining.");
+      await apiRequest(
+        `/api/shipments/${encodeURIComponent(shipment.id)}/status`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            status: nextStatus,
+            note: `Rider scanned shipment and updated status to ${nextStatus.replaceAll("_", " ")}.`,
+          }),
+        },
+      );
+      setTrackingIdInput("");
+      setScanNotice(`${trackingId} updated: ${STATUS_LABEL[nextStatus]}.`);
+      await loadJobs();
+    } catch (scanError) {
+      setError(
+        scanError instanceof Error
+          ? scanError.message
+          : "Unable to scan shipment.",
+      );
+    }
+  };
+
+  const printShipmentQr = async (shipment: RiderShipment) => {
+    try {
+      const dataUrl = await QRCode.toDataURL(shipment.trackingId, {
+        errorCorrectionLevel: "M",
+        margin: 1,
+        width: 360,
+      });
+      const printWindow = window.open("", "_blank", "width=440,height=560");
+      if (!printWindow)
+        throw new Error("Allow pop-ups to print the shipment QR code.");
+      printWindow.document.write(
+        `<!doctype html><html><head><title>Shipment ${shipment.trackingId}</title><style>body{font-family:Arial,sans-serif;text-align:center;padding:28px;color:#111}img{width:280px;height:280px}h1{font-size:20px;letter-spacing:2px}p{font-size:14px}</style></head><body><h1>${shipment.trackingId}</h1><img src="${dataUrl}" alt="Shipment QR code"/><p>JB &amp; Best Logistics</p><script>window.onload=()=>window.print()</script></body></html>`,
+      );
+      printWindow.document.close();
+    } catch (printError) {
+      setError(
+        printError instanceof Error
+          ? printError.message
+          : "Unable to print QR code.",
+      );
+    }
+  };
+
   const activeJobs = jobs.filter(
     (job) =>
       job.shipmentId &&
-      !["delivered", "cancelled"].includes(job.shipmentId.status),
+      !["at_warehouse", "delivered", "cancelled"].includes(
+        job.shipmentId.status,
+      ),
   );
 
   return (
@@ -257,6 +354,13 @@ export const RiderDashboard: React.FC = () => {
           >
             {isOnline ? "Online for offers" : "Offline"}
           </span>
+          <button
+            type="button"
+            onClick={() => setScannerOpen((open) => !open)}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            <QrCode className="h-4 w-4" /> Scan shipment
+          </button>
           <button
             type="button"
             onClick={() => void toggleAvailability()}
@@ -306,6 +410,45 @@ export const RiderDashboard: React.FC = () => {
         >
           {offersError} Use Refresh to retry.
         </p>
+      )}
+
+      {scanNotice && (
+        <p
+          role="status"
+          className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
+        >
+          {scanNotice}
+        </p>
+      )}
+
+      {scannerOpen && (
+        <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+          <QrCameraScanner
+            onScan={(value) => void handleRiderScan(value)}
+            onClose={() => setScannerOpen(false)}
+          />
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleRiderScan(trackingIdInput);
+            }}
+            className="flex flex-col gap-2 sm:flex-row"
+          >
+            <input
+              value={trackingIdInput}
+              onChange={(event) => setTrackingIdInput(event.target.value)}
+              placeholder="Or enter the tracking ID"
+              aria-label="Tracking ID"
+              className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+            <button
+              type="submit"
+              className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+            >
+              Update shipment
+            </button>
+          </form>
+        </section>
       )}
 
       {offers.length > 0 && (
@@ -361,7 +504,23 @@ export const RiderDashboard: React.FC = () => {
         <div className="space-y-3">
           {activeJobs.map((job) => {
             const shipment = job.shipmentId!;
-            const nextStatus = NEXT_STATUS[shipment.status];
+            const needsWarehouse =
+              shipment.status === "picked_up" &&
+              (Boolean(
+                shipment.sender.country &&
+                shipment.receiver.country &&
+                shipment.sender.country.toLowerCase() !==
+                  shipment.receiver.country.toLowerCase(),
+              ) ||
+                Boolean(
+                  shipment.sender.state &&
+                  shipment.receiver.state &&
+                  shipment.sender.state.toLowerCase() !==
+                    shipment.receiver.state.toLowerCase(),
+                ));
+            const nextStatus = needsWarehouse
+              ? undefined
+              : NEXT_STATUS[shipment.status];
             return (
               <article
                 key={job._id}
@@ -405,18 +564,33 @@ export const RiderDashboard: React.FC = () => {
                     {new Date(job.scheduledAt).toLocaleString()}
                   </p>
                 </div>
-                {nextStatus && (
+                <div className="flex flex-col gap-2 sm:min-w-36">
                   <button
                     type="button"
-                    onClick={() => void advanceShipment(shipment)}
-                    disabled={updatingId !== null}
-                    className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+                    onClick={() => void printShipmentQr(shipment)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                   >
-                    {updatingId === shipment._id
-                      ? "Updating..."
-                      : `Mark ${STATUS_LABEL[nextStatus]}`}
+                    <Printer className="h-4 w-4" /> Print QR
                   </button>
-                )}
+                  {nextStatus && (
+                    <button
+                      type="button"
+                      onClick={() => void advanceShipment(shipment)}
+                      disabled={updatingId !== null}
+                      className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      {updatingId === shipment._id
+                        ? "Updating..."
+                        : `Mark ${STATUS_LABEL[nextStatus]}`}
+                    </button>
+                  )}
+                  {needsWarehouse && (
+                    <p className="max-w-52 text-xs text-amber-800">
+                      Take this interstate/international parcel to the warehouse
+                      for intake scanning.
+                    </p>
+                  )}
+                </div>
               </article>
             );
           })}

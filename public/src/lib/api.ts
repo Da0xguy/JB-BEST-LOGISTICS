@@ -104,17 +104,38 @@ export class ApiError extends Error {
   }
 }
 
+export const getAuthToken = () => {
+  const sessionToken = sessionStorage.getItem('jb_best_token');
+  if (sessionToken) return sessionToken;
+  const legacyToken = localStorage.getItem('jb_best_token');
+  if (legacyToken) {
+    sessionStorage.setItem('jb_best_token', legacyToken);
+    localStorage.removeItem('jb_best_token');
+  }
+  return legacyToken;
+};
+
+export const setAuthToken = (token: string) => {
+  sessionStorage.setItem('jb_best_token', token);
+  localStorage.removeItem('jb_best_token');
+};
+
+export const clearAuthToken = () => {
+  sessionStorage.removeItem('jb_best_token');
+  localStorage.removeItem('jb_best_token');
+};
+
 export const apiRequest = async <T>(path: string, options: ApiOptions = {}): Promise<T> => {
   const headers = new Headers(options.headers);
   headers.set('Content-Type', 'application/json');
   if (options.auth !== false) {
-    const token = localStorage.getItem('jb_best_token');
+    const token = getAuthToken();
     if (token) headers.set('Authorization', `Bearer ${token}`);
   }
   const response = await fetch(`${API_URL}${path}`, { ...options, headers });
   const body = await response.json().catch(() => ({}));
   if (response.status === 401 && options.auth !== false) {
-    localStorage.removeItem('jb_best_token');
+    clearAuthToken();
     window.dispatchEvent(new Event('jb:auth-expired'));
   }
   if (!response.ok) throw new ApiError(body.error || 'Request failed', response.status, body.code);
@@ -222,9 +243,12 @@ export const bookPickupShipment = (booking: {
 
 const shipmentStatus = (status: string): ShipmentStatus => {
   switch (status) {
+    case 'assigned':
+      return 'assigned';
     case 'picked_up':
       return 'picked_up';
     case 'at_warehouse':
+      return 'at_warehouse';
     case 'in_transit':
       return 'in_transit';
     case 'out_for_delivery':
