@@ -7,6 +7,10 @@ export default defineConfig(() => {
   return {
     root: path.resolve(__dirname, 'public'),
     publicDir: path.resolve(__dirname, 'public/assets'),
+    build: {
+      outDir: path.resolve(__dirname, 'dist'),
+      emptyOutDir: true,
+    },
     plugins: [react(), tailwindcss()],
     define: {
       global: 'globalThis',
