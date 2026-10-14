@@ -48,7 +48,6 @@ import {
   Briefcase,
   Store,
 } from "lucide-react";
-import { Span } from "next/dist/trace";
 
 type ToastVariant = "success" | "error" | "info" | "processing";
 
