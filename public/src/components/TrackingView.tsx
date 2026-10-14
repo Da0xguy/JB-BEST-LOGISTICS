@@ -125,20 +125,37 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
     void lookupShipment(trackingNumber);
   };
 
-  const getStatusIndex = (status: ShipmentStatus) => {
-    const order: ShipmentStatus[] = [
-      "order_created",
-      "picked_up",
-      "at_warehouse",
-      "in_transit",
-      "out_for_delivery",
-      "delivered",
-    ];
-    return order.indexOf(status);
-  };
+  const currentMilestones = currentShipment
+    ? (() => {
+        const senderCountry = currentShipment.sender.country
+          .trim()
+          .toLowerCase();
+        const recipientCountry = currentShipment.recipient.country
+          .trim()
+          .toLowerCase();
+        const hasWarehouseMilestone =
+          (senderCountry !== "" &&
+            recipientCountry !== "" &&
+            senderCountry !== recipientCountry) ||
+          currentShipment.currentStatus === "at_warehouse" ||
+          currentShipment.trackingLogs.some(
+            (event) => event.status === "at_warehouse",
+          );
 
+        return hasWarehouseMilestone
+          ? MILESTONES
+          : MILESTONES.filter(
+              (milestone) => milestone.status !== "at_warehouse",
+            );
+      })()
+    : MILESTONES;
   const currentIndex = currentShipment
-    ? Math.max(0, getStatusIndex(currentShipment.currentStatus))
+    ? Math.max(
+        0,
+        currentMilestones.findIndex(
+          (milestone) => milestone.status === currentShipment.currentStatus,
+        ),
+      )
     : 0;
 
   const getCarrierBadge = (carrier: string) => {
@@ -344,11 +361,11 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
                 <div
                   className="absolute top-4 left-[10%] h-1 bg-blue-600 -z-0 transition-all duration-500 rounded-full"
                   style={{
-                    width: `${Math.max(0, Math.min(100, (currentIndex / (MILESTONES.length - 1)) * 80))}%`,
+                    width: `${Math.max(0, Math.min(100, (currentIndex / (currentMilestones.length - 1)) * 80))}%`,
                   }}
                 />
 
-                {MILESTONES.map((milestone, idx) => {
+                {currentMilestones.map((milestone, idx) => {
                   const isPassed = idx <= currentIndex;
                   const isCurrent = idx === currentIndex;
 

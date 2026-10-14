@@ -8,6 +8,7 @@ import { ActivityLog, DispatchOffer, MailboxProfile, Notification, PickupJob, Ri
 import { dispatchQueuedShipments, dispatchShipment, eligibleVehiclesForPackage } from '../services/dispatchService';
 import { emitToShipment, emitToUser } from '../realtime';
 import { ApiError } from './apiError';
+import { sendMail } from '../lib/email';
 
 interface GeoPoint {
   type: 'Point';
@@ -101,6 +102,7 @@ export const bookShipment: RequestHandler = async (request, response) => {
   const initialEvent = appendTrackingEvent('booked', 'Shipment booking created', user._id.toString());
   const session = await mongoose.startSession();
   let shipment: ShipmentDocument | undefined;
+  let customerEmail: string | undefined;
 
   try {
     await session.withTransaction(async () => {
@@ -137,6 +139,9 @@ export const bookShipment: RequestHandler = async (request, response) => {
         title: 'Shipment booked',
         body: `Tracking number ${created.trackingId} is ready.`,
       }], { session });
+
+      const customer = await User.findById(customerId).select('email');
+      customerEmail = customer?.email;
       await ActivityLog.create([{
         actorId: user._id,
         action: 'create',
@@ -152,7 +157,35 @@ export const bookShipment: RequestHandler = async (request, response) => {
 
   emitToShipment(shipment._id.toString(), 'tracking:status', { trackingNumber: shipment.trackingId, status: shipment.status, history: shipment.tracking_history });
   void dispatchShipment(shipment._id.toString()).catch((error: unknown) => console.error('Automatic dispatch failed', error));
-  return response.status(201).json({ shipment, trackingNumber: shipment.trackingId, quote });
+
+  const emailNotifications = await Promise.all([
+    ...(process.env.ADMIN_EMAIL?.trim()
+      ? [{
+          recipient: 'admin' as const,
+          email: process.env.ADMIN_EMAIL.trim(),
+          subject: `New shipment booked: ${shipment.trackingId}`,
+          html: `<p>A new shipment has been booked.</p><p>Tracking ID: ${shipment.trackingId}</p>`,
+        }]
+      : []),
+    ...(customerEmail
+      ? [{
+          recipient: 'customer' as const,
+          email: customerEmail,
+          subject: `Your shipment ${shipment.trackingId} is booked`,
+          html: `<p>Dear customer,</p><p>Your shipment has been successfully booked. Tracking ID: ${shipment.trackingId}</p>`,
+        }]
+      : []),
+  ].map(async ({ recipient, email, subject, html }) => {
+    try {
+      await sendMail(email, subject, html);
+      return { recipient, status: 'sent' as const };
+    } catch (error) {
+      console.error(`Shipment booking email failed for ${recipient}:`, error);
+      return { recipient, status: 'failed' as const };
+    }
+  }));
+
+  return response.status(201).json({ shipment, trackingNumber: shipment.trackingId, quote, emailNotifications });
 };
 
 export const trackShipment: RequestHandler = async (req, res) => {

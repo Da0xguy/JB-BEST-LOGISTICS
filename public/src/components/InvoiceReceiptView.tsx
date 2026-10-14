@@ -251,6 +251,20 @@ export const InvoiceReceiptView: React.FC<InvoiceReceiptViewProps> = ({
                     <ShieldCheck className="w-4 h-4 text-emerald-400" />
                     <span>Pay with Paystack</span>
                   </button>
+
+                  <button
+                    onClick={() => handlePay('cash')}
+                    disabled={isProcessingPayment}
+                    className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-semibold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-60"
+                  >
+                    <DollarSign className="w-4 h-4" />
+                    <span>Pay with Cash Onsite (2450 Piedmont Rd NE)</span>
+                  </button>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-gray-50 border border-gray-200 text-[11px] text-gray-600 leading-relaxed">
+                  <p className="font-semibold text-gray-900 mb-0.5">Physical Store Cash Desk:</p>
+                  <span>Visit our retail center at 2450 Piedmont Rd NE, Atlanta, GA 30324 to settle with cash or money order at the counter register.</span>
                 </div>
 
                 <div className="pt-2 flex items-center justify-center gap-1.5 text-xs text-gray-400">

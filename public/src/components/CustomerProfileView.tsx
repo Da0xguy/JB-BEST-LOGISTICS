@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { LocateFixed, UserRound } from "lucide-react";
+import { LocateFixed, LogOut, UserRound } from "lucide-react";
 import {
   CustomerProfile,
   clearAuthToken,
@@ -12,11 +12,13 @@ import {
 interface CustomerProfileViewProps {
   onProfileSaved: (profile: CustomerProfile) => void;
   onOpenAuth: () => void;
+  onSignOut: () => void;
 }
 
 export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
   onProfileSaved,
   onOpenAuth,
+  onSignOut,
 }) => {
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -172,14 +174,25 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
 
   return (
     <section className="mx-auto max-w-3xl space-y-5">
-      <header>
-        <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
-          Account
-        </p>
-        <h1 className="mt-1 text-2xl font-bold text-gray-900">Your profile</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Saved details are used to prefill pickup and appointment requests.
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
+            Account
+          </p>
+          <h1 className="mt-1 text-2xl font-bold text-gray-900">
+            Your profile
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Saved details are used to prefill pickup and appointment requests.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onSignOut}
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+        >
+          <LogOut className="h-4 w-4" /> Sign out
+        </button>
       </header>
       <form
         onSubmit={handleSubmit}

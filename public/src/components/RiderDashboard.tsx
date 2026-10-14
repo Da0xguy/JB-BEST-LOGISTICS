@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import QRCode from "qrcode";
 import {
   Check,
   MapPin,
@@ -22,6 +21,7 @@ import {
   setRiderAvailability,
   updateRiderLocation,
 } from "../lib/api";
+import { printShipmentLabel } from "../lib/printShipmentLabel";
 
 type RiderShipmentStatus =
   | "assigned"
@@ -266,10 +266,10 @@ export const RiderDashboard: React.FC = () => {
 
       if (shipment.currentStatus === "picked_up") {
         const needsWarehouse =
+          Boolean(shipment.sender.country.trim()) &&
+          Boolean(shipment.recipient.country?.trim()) &&
           shipment.sender.country.trim().toLowerCase() !==
-            shipment.recipient.country.trim().toLowerCase() ||
-          shipment.sender.state.trim().toLowerCase() !==
-            shipment.recipient.state.trim().toLowerCase();
+            shipment.recipient.country!.trim().toLowerCase();
         if (needsWarehouse) {
           throw new Error(
             "Take this shipment to the warehouse. Staff will scan receipt before outbound shipping.",
@@ -303,20 +303,13 @@ export const RiderDashboard: React.FC = () => {
     }
   };
 
-  const printShipmentQr = async (shipment: RiderShipment) => {
+  const printShipmentLabelForRider = async (shipment: RiderShipment) => {
     try {
-      const dataUrl = await QRCode.toDataURL(shipment.trackingId, {
-        errorCorrectionLevel: "M",
-        margin: 1,
-        width: 360,
+      await printShipmentLabel({
+        trackingNumber: shipment.trackingId,
+        sender: shipment.sender,
+        recipient: shipment.receiver,
       });
-      const printWindow = window.open("", "_blank", "width=440,height=560");
-      if (!printWindow)
-        throw new Error("Allow pop-ups to print the shipment QR code.");
-      printWindow.document.write(
-        `<!doctype html><html><head><title>Shipment ${shipment.trackingId}</title><style>body{font-family:Arial,sans-serif;text-align:center;padding:28px;color:#111}img{width:280px;height:280px}h1{font-size:20px;letter-spacing:2px}p{font-size:14px}</style></head><body><h1>${shipment.trackingId}</h1><img src="${dataUrl}" alt="Shipment QR code"/><p>JB &amp; Best Logistics</p><script>window.onload=()=>window.print()</script></body></html>`,
-      );
-      printWindow.document.close();
     } catch (printError) {
       setError(
         printError instanceof Error
@@ -506,18 +499,10 @@ export const RiderDashboard: React.FC = () => {
             const shipment = job.shipmentId!;
             const needsWarehouse =
               shipment.status === "picked_up" &&
-              (Boolean(
-                shipment.sender.country &&
-                shipment.receiver.country &&
-                shipment.sender.country.toLowerCase() !==
-                  shipment.receiver.country.toLowerCase(),
-              ) ||
-                Boolean(
-                  shipment.sender.state &&
-                  shipment.receiver.state &&
-                  shipment.sender.state.toLowerCase() !==
-                    shipment.receiver.state.toLowerCase(),
-                ));
+              Boolean(shipment.sender.country?.trim()) &&
+              Boolean(shipment.receiver.country?.trim()) &&
+              shipment.sender.country!.trim().toLowerCase() !==
+                shipment.receiver.country!.trim().toLowerCase();
             const nextStatus = needsWarehouse
               ? undefined
               : NEXT_STATUS[shipment.status];
@@ -567,10 +552,10 @@ export const RiderDashboard: React.FC = () => {
                 <div className="flex flex-col gap-2 sm:min-w-36">
                   <button
                     type="button"
-                    onClick={() => void printShipmentQr(shipment)}
+                    onClick={() => void printShipmentLabelForRider(shipment)}
                     className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                   >
-                    <Printer className="h-4 w-4" /> Print QR
+                    <Printer className="h-4 w-4" /> Print label
                   </button>
                   {nextStatus && (
                     <button

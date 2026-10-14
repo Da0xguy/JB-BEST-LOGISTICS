@@ -8,6 +8,11 @@ const developmentClientOrigins = process.env.NODE_ENV === 'production'
   ? []
   : ['http://localhost:3000', 'http://localhost:3001'];
 
+const mongoUri = process.env.MONGODB_URI?.trim();
+if (!mongoUri) {
+  throw new Error('MONGODB_URI is required. Set it in your .env file.');
+}
+
 const required = (name: string, fallback?: string) => {
   const value = process.env[name] || fallback;
   if (!value && process.env.NODE_ENV === 'production') {
@@ -18,7 +23,7 @@ const required = (name: string, fallback?: string) => {
 
 export const config = {
   port: Number(process.env.PORT || 4000),
-  mongoUri: required('MONGODB_URI', 'mongodb://127.0.0.1:27017/jb_best_logistics'),
+  mongoUri,
   jwtSecret: required('JWT_SECRET', 'development-only-change-me'),
   clientOrigin: configuredClientOrigins[0] || 'http://localhost:3000',
   clientOrigins: [...new Set([...configuredClientOrigins, ...developmentClientOrigins])],

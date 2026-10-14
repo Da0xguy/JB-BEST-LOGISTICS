@@ -20,11 +20,15 @@ const MILESTONES: { status: ShipmentStatus; label: string }[] = [
   { status: "order_created", label: "Order created" },
   { status: "assigned", label: "Rider assigned" },
   { status: "picked_up", label: "Picked up" },
-  { status: "at_warehouse", label: "At warehouse" },
   { status: "in_transit", label: "In transit" },
   { status: "out_for_delivery", label: "Out for delivery" },
   { status: "delivered", label: "Delivered" },
 ];
+
+const WAREHOUSE_MILESTONE: (typeof MILESTONES)[number] = {
+  status: "at_warehouse",
+  label: "At warehouse",
+};
 
 const mapStatus = (status: string): ShipmentStatus => {
   if (status === "assigned") return "assigned";
@@ -205,9 +209,20 @@ export default function TrackingPage({ params }: PageProps) {
     );
   }
 
+  const senderCountry = shipment.sender.country.trim().toLowerCase();
+  const recipientCountry = shipment.recipient.country.trim().toLowerCase();
+  const hasWarehouseMilestone =
+    (senderCountry !== "" &&
+      recipientCountry !== "" &&
+      senderCountry !== recipientCountry) ||
+    shipment.currentStatus === "at_warehouse" ||
+    shipment.trackingLogs.some((event) => event.status === "at_warehouse");
+  const milestones = hasWarehouseMilestone
+    ? [...MILESTONES.slice(0, 3), WAREHOUSE_MILESTONE, ...MILESTONES.slice(3)]
+    : MILESTONES;
   const currentIndex = Math.max(
     0,
-    MILESTONES.findIndex(({ status }) => status === shipment.currentStatus),
+    milestones.findIndex(({ status }) => status === shipment.currentStatus),
   );
 
   return (
@@ -264,7 +279,7 @@ export default function TrackingPage({ params }: PageProps) {
           </div>
 
           <div className="mt-8 grid grid-cols-3 gap-3 sm:grid-cols-7">
-            {MILESTONES.map((milestone, index) => (
+            {milestones.map((milestone, index) => (
               <div key={milestone.status} className="text-center">
                 <div
                   className={`mx-auto flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold ${index <= currentIndex ? "bg-blue-700 text-white" : "border border-slate-300 bg-white text-slate-400"}`}

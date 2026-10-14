@@ -291,6 +291,30 @@ const paymentSchema = new Schema({
 }, { timestamps: true });
 
 export const User: Model<UserDocument> = mongoose.models.User || mongoose.model<UserDocument>('User', userSchema);
+
+export interface AuthVerificationDocument extends Document {
+  email: string;
+  purpose: 'registration' | 'password_reset';
+  codeHash: string;
+  expiresAt: Date;
+  attempts: number;
+  name?: string;
+  passwordHash?: string;
+}
+
+const authVerificationSchema = new Schema<AuthVerificationDocument>({
+  email: { type: String, required: true, lowercase: true, trim: true },
+  purpose: { type: String, enum: ['registration', 'password_reset'], required: true },
+  codeHash: { type: String, required: true },
+  expiresAt: { type: Date, required: true, index: { expires: 0 } },
+  attempts: { type: Number, default: 0, min: 0 },
+  name: String,
+  passwordHash: String,
+});
+authVerificationSchema.index({ email: 1, purpose: 1 }, { unique: true });
+
+export const AuthVerification: Model<AuthVerificationDocument> = mongoose.models.AuthVerification || mongoose.model<AuthVerificationDocument>('AuthVerification', authVerificationSchema);
+
 export const RiderProfile: Model<RiderProfileDocument> = mongoose.models.RiderProfile || mongoose.model<RiderProfileDocument>('RiderProfile', riderProfileSchema);
 export const MailboxProfile: Model<MailboxProfileDocument> = mongoose.models.MailboxProfile || mongoose.model<MailboxProfileDocument>('MailboxProfile', mailboxProfileSchema);
 export const AppointmentBooking: Model<AppointmentBookingDocument> = mongoose.models.AppointmentBooking || mongoose.model<AppointmentBookingDocument>('AppointmentBooking', appointmentBookingSchema);

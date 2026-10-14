@@ -9,13 +9,14 @@ import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import { config } from './config';
 import { connectDatabase } from './db';
-import { ActivityLog, AppointmentBooking, MailboxProfile, Notification, Payment, PickupJob, RiderProfile, Shipment, User, type AppointmentService, type DeliveryOption, type Role, type ShipmentStatus } from './models';
+import { ActivityLog, AppointmentBooking, AuthVerification, MailboxProfile, Notification, Payment, PickupJob, RiderProfile, Shipment, User, type AppointmentService, type DeliveryOption, type Role, type ShipmentStatus } from './models';
 import { allowRoles, issueToken, publicUser, requireAuth, type AuthRequest } from './auth';
 import { calculateQuote, isAfterDropoffCutoff } from './pricing';
 import { ApiError } from './controllers/apiError';
 import v1Router from './routes/v1';
 import { emitToShipment, initializeRealtime } from './realtime';
 import { dispatchQueuedShipments } from './services/dispatchService';
+import { isEmailConfigured, sendMail } from './lib/email';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -27,6 +28,79 @@ app.use('/api/v1', v1Router);
 
 const asyncRoute = (handler: express.RequestHandler): express.RequestHandler => (req, res, next) => {
   Promise.resolve(handler(req, res, next)).catch(next);
+};
+
+const verificationRequestLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many verification requests. Please try again later.' },
+});
+const verificationAttemptLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many verification attempts. Please try again later.' },
+});
+
+const ensureEmailConfigured = () => {
+  if (!isEmailConfigured()) {
+    throw new ApiError(503, 'Email delivery is not configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL, or configure SMTP_HOST, SMTP_USER, and SMTP_PASS in your .env file.');
+  }
+};
+
+const hashVerificationCode = (code: string) =>
+  crypto.createHmac('sha256', config.jwtSecret).update(code).digest('hex');
+
+const issueVerificationCode = async (
+  email: string,
+  purpose: 'registration' | 'password_reset',
+  details: { name?: string; passwordHash?: string } = {},
+) => {
+  ensureEmailConfigured();
+  const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
+  const challenge = await AuthVerification.findOneAndUpdate(
+    { email, purpose },
+    {
+      $set: {
+        codeHash: hashVerificationCode(code),
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        attempts: 0,
+        ...details,
+      },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
+  try {
+    await sendMail(
+      email,
+      purpose === 'registration' ? 'Verify your JB & Best account' : 'Reset your JB & Best password',
+      `<p>Your verification code is:</p><p style="font-size:24px;font-weight:bold;letter-spacing:6px">${code}</p><p>This code expires in 10 minutes. If you did not request it, you can ignore this email.</p>`,
+    );
+  } catch (error) {
+    await AuthVerification.deleteOne({ _id: challenge._id });
+    throw error;
+  }
+};
+
+const verifyCode = async (email: string, purpose: 'registration' | 'password_reset', code: string) => {
+  const challenge = await AuthVerification.findOne({ email, purpose });
+  if (!challenge || challenge.expiresAt.getTime() <= Date.now() || challenge.attempts >= 5) {
+    if (challenge) await AuthVerification.deleteOne({ _id: challenge._id });
+    return null;
+  }
+  const expected = Buffer.from(challenge.codeHash, 'hex');
+  const supplied = Buffer.from(hashVerificationCode(code), 'hex');
+  if (expected.length !== supplied.length || !crypto.timingSafeEqual(expected, supplied)) {
+    await AuthVerification.updateOne(
+      { _id: challenge._id, attempts: challenge.attempts },
+      { $inc: { attempts: 1 } },
+    );
+    return null;
+  }
+  return challenge;
 };
 
 const createTrackingId = async () => {
@@ -42,13 +116,67 @@ const logActivity = (req: AuthRequest, action: string, resource: string, resourc
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'jb-best-logistics-api' }));
 
-app.post('/api/auth/register', asyncRoute(async (req, res) => {
-  const { email, password, name, phone } = req.body as Record<string, string>;
-  if (!email || !password || !name || password.length < 8) return res.status(400).json({ error: 'Name, email, and an 8-character password are required' });
-  const exists = await User.exists({ email: email.toLowerCase() });
+app.post('/api/auth/register', verificationRequestLimiter, asyncRoute(async (req, res) => {
+  const body = req.body as Record<string, unknown>;
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const password = typeof body.password === 'string' ? body.password : '';
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !name || password.length < 8) {
+    return res.status(400).json({ error: 'A valid email, name, and an 8-character password are required' });
+  }
+  const exists = await User.exists({ email });
   if (exists) return res.status(409).json({ error: 'An account with this email already exists' });
-  const user = await User.create({ email: email.toLowerCase(), passwordHash: await bcrypt.hash(password, 12), name, phone, role: 'customer' });
+  await issueVerificationCode(email, 'registration', {
+    name,
+    passwordHash: await bcrypt.hash(password, 12),
+  });
+  return res.json({ message: 'A verification code has been sent to your email address.' });
+}));
+
+app.post('/api/auth/register/verify', verificationAttemptLimiter, asyncRoute(async (req, res) => {
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const code = typeof req.body.code === 'string' ? req.body.code.trim() : '';
+  if (!email || !/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Enter the email address and 6-digit verification code' });
+  const challenge = await verifyCode(email, 'registration', code);
+  if (!challenge?.name || !challenge.passwordHash) return res.status(400).json({ error: 'The verification code is invalid or expired' });
+  const user = await User.create({
+    email,
+    passwordHash: challenge.passwordHash,
+    name: challenge.name,
+    role: 'customer',
+  });
+  await AuthVerification.deleteOne({ _id: challenge._id });
   return res.status(201).json({ user: publicUser(user), token: issueToken(user) });
+}));
+
+app.post('/api/auth/forgot-password', verificationRequestLimiter, asyncRoute(async (req, res) => {
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email address' });
+  ensureEmailConfigured();
+  const user = await User.findOne({ email, status: 'active' });
+  if (user) await issueVerificationCode(email, 'password_reset');
+  return res.json({ message: 'If an active account exists for that email, a verification code has been sent.' });
+}));
+
+app.post('/api/auth/reset-password', verificationAttemptLimiter, asyncRoute(async (req, res) => {
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const code = typeof req.body.code === 'string' ? req.body.code.trim() : '';
+  const password = typeof req.body.password === 'string' ? req.body.password : '';
+  if (!email || !/^\d{6}$/.test(code) || password.length < 8) {
+    return res.status(400).json({ error: 'Enter a valid email, 6-digit verification code, and password of at least 8 characters' });
+  }
+  const challenge = await verifyCode(email, 'password_reset', code);
+  if (!challenge) return res.status(400).json({ error: 'The verification code is invalid or expired' });
+  const user = await User.findOne({ email, status: 'active' });
+  if (!user) {
+    await AuthVerification.deleteOne({ _id: challenge._id });
+    return res.status(400).json({ error: 'The verification code is invalid or expired' });
+  }
+  user.passwordHash = await bcrypt.hash(password, 12);
+  user.mustChangePassword = false;
+  await user.save();
+  await AuthVerification.deleteOne({ _id: challenge._id });
+  return res.json({ message: 'Your password has been reset. You can now sign in.' });
 }));
 
 app.post('/api/auth/login', asyncRoute(async (req, res) => {

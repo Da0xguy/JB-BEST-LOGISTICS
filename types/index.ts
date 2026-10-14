@@ -173,6 +173,27 @@ export interface PickupRequest {
   totalWeightLbs: number;
   packageDimensions?: PackageDimensions;
   specialInstructions?: string;
+  deliveryAddress?: {
+    name: string;
+    phone: string;
+    street: string;
+    suite?: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+  };
+  destinationType?: 'local' | 'out_of_state' | 'international';
+  directCarrierTransfer?: boolean;
+  carrierHubName?: string;
+  mileageMiles?: number;
+  packageSizeCategory?: 'small' | 'medium' | 'large' | 'freight';
+  totalEstimatedCost?: number;
+  depositAmount?: number;
+  remainingBalance?: number;
+  depositPaid?: boolean;
+  paymentMethod?: 'card' | 'paystack' | 'cash_onsite';
+  paidAtRegister?: boolean;
   status: PickupRequestStatus;
   assignedDriverId?: string;
   createdAt: string;
@@ -197,6 +218,7 @@ export interface Invoice {
   customerId: string;
   customerName: string;
   customerEmail: string;
+  customerCompany?: string;
   customerAddress?: string;
   items: InvoiceItem[];
   subtotal: number;
@@ -225,4 +247,37 @@ export interface MailboxRental {
   renewalDate: string;
   keyFobId: string;
   packagesHeld: number;
+}
+
+export type StaffRole = 'admin' | 'rider' | 'warehouse' | 'warehouse_staff' | 'associate';
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: StaffRole;
+  status: 'active' | 'suspended';
+  vehicleType?: 'bike' | 'van' | 'truck';
+  weightCapacityKg?: number;
+  operatingZone?: string;
+  activeOrdersCount?: number;
+  lastActive?: string;
+}
+
+export interface StaffActivity {
+  id: string;
+  staffId: string;
+  staffName: string;
+  staffRole: StaffRole;
+  action:
+    | 'pickup_assigned'
+    | 'shipment_intake'
+    | 'cash_collected'
+    | 'status_update'
+    | 'account_created'
+    | 'carrier_tendered';
+  details: string;
+  targetTrackingId?: string;
+  timestamp: string;
 }

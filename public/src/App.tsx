@@ -167,6 +167,12 @@ export default function App() {
   const [userRole, setUserRole] = useState<UserRole>("customer");
   const [customerProfile, setCustomerProfile] =
     useState<CustomerProfile | null>(null);
+  const [customerAccess, setCustomerAccess] = useState<
+    "checking" | "guest" | "authenticated"
+  >(() => (getAuthToken() ? "checking" : "guest"));
+  const [pendingCustomerTab, setPendingCustomerTab] = useState<string | null>(
+    null,
+  );
   const [isArchitectureOpen, setIsArchitectureOpen] = useState<boolean>(false);
   const [heroSearch, setHeroSearch] = useState<string>("");
   const [isAuthPageOpen, setIsAuthPageOpen] = useState(false);
@@ -187,30 +193,56 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (pathname !== "/" || !getAuthToken()) return;
+    if (pathname !== "/") return;
+    if (!getAuthToken()) {
+      setCustomerAccess("guest");
+      return;
+    }
     let isCurrent = true;
+    setCustomerAccess("checking");
     const loadCustomerProfile = async () => {
       try {
         const { user } = await getCurrentUser();
-        if (!isCurrent || user.role !== "customer") return;
-        const [{ profile, mailboxes }, orders, appointmentResult] =
-          await Promise.all([
-            getCustomerProfile(),
-            listCustomerShipments(),
-            listWarehouseAppointmentHistory(),
-          ]);
+        if (!isCurrent) return;
+        if (user.role !== "customer") {
+          clearAuthToken();
+          setCustomerAccess("guest");
+          return;
+        }
+        const { profile, mailboxes } = await getCustomerProfile();
         if (!isCurrent) return;
         setCustomerProfile({ ...profile, mailboxes });
-        setShipments(orders.shipments);
-        setPickups(orders.pickups);
-        setAppointments(appointmentResult.appointments);
-      } catch {}
+        setCustomerAccess("authenticated");
+        void Promise.all([
+          listCustomerShipments(),
+          listWarehouseAppointmentHistory(),
+        ])
+          .then(([orders, appointmentResult]) => {
+            if (!isCurrent) return;
+            setShipments(orders.shipments);
+            setPickups(orders.pickups);
+            setAppointments(appointmentResult.appointments);
+          })
+          .catch(() => {});
+      } catch {
+        if (isCurrent) setCustomerAccess("guest");
+      }
     };
     void loadCustomerProfile();
     return () => {
       isCurrent = false;
     };
   }, [pathname]);
+
+  useEffect(() => {
+    if (!pendingCustomerTab) return;
+    if (customerAccess === "authenticated") {
+      setActiveTab(pendingCustomerTab);
+      setPendingCustomerTab(null);
+    } else if (customerAccess === "guest") {
+      setIsAuthPageOpen(true);
+    }
+  }, [customerAccess, pendingCustomerTab]);
 
   useEffect(() => {
     if (pathname !== "/rider" && pathname !== "/staff" && pathname !== "/admin")
@@ -265,6 +297,9 @@ export default function App() {
       setShipments([]);
       setPickups([]);
       setAppointments([]);
+      setCustomerAccess("guest");
+      setPendingCustomerTab(null);
+      setActiveTab("services");
     };
     window.addEventListener("jb:auth-expired", handleExpiredSession);
     return () =>
@@ -343,6 +378,34 @@ export default function App() {
     const id = Date.now() + Math.random();
     setToasts((current) => [...current, { id, title, message, variant }]);
     window.setTimeout(() => removeToast(id), 4200);
+  };
+
+  const openCustomerAuth = (returnToTab = "services") => {
+    setPendingCustomerTab(returnToTab);
+    setIsAuthPageOpen(true);
+  };
+
+  const navigateConsumerTab = (tab: string) => {
+    if (tab !== "track" && customerAccess !== "authenticated") {
+      setPendingCustomerTab(tab);
+      setActiveTab("track");
+      if (customerAccess === "guest") setIsAuthPageOpen(true);
+      return;
+    }
+    setPendingCustomerTab(null);
+    setActiveTab(tab);
+  };
+
+  const signOutCustomer = () => {
+    clearAuthToken();
+    setCustomerProfile(null);
+    setShipments([]);
+    setPickups([]);
+    setAppointments([]);
+    setCustomerAccess("guest");
+    setPendingCustomerTab(null);
+    setUserRole("customer");
+    setActiveTab("services");
   };
 
   const loadCustomerData = async () => {
@@ -478,6 +541,12 @@ export default function App() {
     );
   };
 
+  const handleUpdatePickup = (updated: PickupRequest) => {
+    setPickups((prev) =>
+      prev.map((p) => (p.id === updated.id ? updated : p)),
+    );
+  };
+
   const handleQuickTrack = (trackingNo: string) => {
     const trimmed = trackingNo.trim();
     if (!trimmed) {
@@ -569,6 +638,8 @@ export default function App() {
                   pickups={pickups}
                   onUpdateInvoice={handleUpdateInvoice}
                   onOpenArchitecture={() => setIsArchitectureOpen(true)}
+                  onUpdatePickup={handleUpdatePickup}
+                  onUpdatePickups={setPickups}
                 />
               )}
             </main>
@@ -592,7 +663,7 @@ export default function App() {
       {/* Top Header & Navigation with Integrated Role/Dashboard Switcher */}
       <Navbar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={navigateConsumerTab}
         portal={portal}
         setPortal={(newPortal) => {
           setPortal(newPortal);
@@ -602,7 +673,9 @@ export default function App() {
         }}
         userRole={userRole}
         setUserRole={setUserRole}
-        onOpenAuth={() => setIsAuthPageOpen(true)}
+        customerName={customerProfile?.name}
+        isCustomerAuthenticated={customerAccess === "authenticated"}
+        onOpenAuth={() => openCustomerAuth("services")}
         onOpenArchitecture={() => setIsArchitectureOpen(true)}
       />
 
@@ -621,6 +694,9 @@ export default function App() {
             );
             setIsAuthPageOpen(false);
             if (role === "customer") {
+              setCustomerAccess("authenticated");
+              setActiveTab(pendingCustomerTab || "services");
+              setPendingCustomerTab(null);
               void Promise.all([
                 getCustomerProfile().then(({ profile, mailboxes }) =>
                   setCustomerProfile({ ...profile, mailboxes }),
@@ -666,6 +742,8 @@ export default function App() {
               pickups={pickups}
               onUpdateInvoice={handleUpdateInvoice}
               onOpenArchitecture={() => setIsArchitectureOpen(true)}
+              onUpdatePickup={handleUpdatePickup}
+              onUpdatePickups={setPickups}
             />
           )}
 
@@ -774,17 +852,17 @@ export default function App() {
                 {activeTab === "services" && (
                   <ServicesHubView
                     onSelectService={(s) => {
-                      if (s === "pickup") setActiveTab("pickup");
+                      if (s === "pickup") navigateConsumerTab("pickup");
                       else if (s === "notary" || s === "packing")
-                        setActiveTab("appointment");
-                      else setActiveTab("track");
+                        navigateConsumerTab("appointment");
+                      else navigateConsumerTab("track");
                     }}
                     onBookAppointment={() => {
-                      setActiveTab("appointment");
+                      navigateConsumerTab("appointment");
                       window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
                     onSchedulePickup={() => {
-                      setActiveTab("pickup");
+                      navigateConsumerTab("pickup");
                       window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
                   />
@@ -828,8 +906,12 @@ export default function App() {
       )}
       {activeTab === "profile" && (
         <CustomerProfileView
-          onProfileSaved={setCustomerProfile}
-          onOpenAuth={() => setIsAuthPageOpen(true)}
+          onProfileSaved={(profile) => {
+            setCustomerProfile(profile);
+            setCustomerAccess("authenticated");
+          }}
+          onOpenAuth={() => openCustomerAuth("profile")}
+          onSignOut={signOutCustomer}
         />
       )}
 
@@ -872,7 +954,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       setPortal("consumer");
-                      setActiveTab("services");
+                      navigateConsumerTab("services");
                       window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
                     className="hover:text-blue-600 transition cursor-pointer"
@@ -884,7 +966,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       setPortal("consumer");
-                      setActiveTab("services");
+                      navigateConsumerTab("services");
                       window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
                     className="hover:text-blue-600 transition cursor-pointer"
@@ -896,7 +978,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       setPortal("consumer");
-                      setActiveTab("appointment");
+                      navigateConsumerTab("appointment");
                       window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
                     className="hover:text-blue-600 transition cursor-pointer"
@@ -908,7 +990,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       setPortal("consumer");
-                      setActiveTab("pickup");
+                      navigateConsumerTab("pickup");
                       window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
                     className="hover:text-blue-600 transition cursor-pointer"

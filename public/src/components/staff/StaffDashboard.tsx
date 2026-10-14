@@ -28,6 +28,7 @@ import {
 import { WarehouseMailboxView } from "./WarehouseMailboxView";
 import { WarehouseHistoryView } from "./WarehouseHistoryView";
 import { extractTrackingId, QrCameraScanner } from "../QrCameraScanner";
+import { printShipmentLabel } from "../../lib/printShipmentLabel";
 
 interface StaffDashboardProps {
   shipments: Shipment[];
@@ -85,134 +86,6 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
     kind: "intake" | "appointment";
     appointmentId?: string;
   }>(null);
-
-  const printShipmentLabel = (shipment: Shipment | null | undefined) => {
-    if (!shipment) return;
-
-    const printWindow = window.open("", "_blank", "width=440,height=700");
-    if (!printWindow) return;
-
-    const formatAddress = (addr: Shipment["sender"] | Shipment["recipient"]) =>
-      `${addr.name}\n${addr.street}${addr.suite ? `, ${addr.suite}` : ""}\n${addr.city}, ${addr.state} ${addr.zip}\n${addr.country}`;
-
-    printWindow.document.write(`
-      <!doctype html>
-      <html>
-        <head>
-          <title>JB & Best Logistics Label</title>
-          <style>
-            body {
-              margin: 0;
-              font-family: Arial, sans-serif;
-              background: #f8fafc;
-              color: #0f172a;
-            }
-            .label {
-              width: 100%;
-              max-width: 360px;
-              margin: 18px auto;
-              background: white;
-              border: 2px solid #0f172a;
-              border-radius: 16px;
-              padding: 18px 16px;
-              box-sizing: border-box;
-            }
-            .header {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              margin-bottom: 12px;
-              border-bottom: 1px solid #e2e8f0;
-              padding-bottom: 8px;
-            }
-            .brand {
-              font-size: 14px;
-              font-weight: 700;
-              letter-spacing: 0.06em;
-            }
-            .tracking {
-              font-size: 12px;
-              font-weight: 700;
-              color: #334155;
-            }
-            .qr-box {
-              display: flex;
-              justify-content: center;
-              margin: 12px 0 18px;
-            }
-            .qr-box img {
-              width: 164px;
-              height: 164px;
-              border: 2px solid #e2e8f0;
-              border-radius: 10px;
-              background: white;
-              padding: 8px;
-            }
-            .section {
-              margin-bottom: 12px;
-            }
-            .section-label {
-              font-size: 10px;
-              font-weight: 700;
-              letter-spacing: 0.12em;
-              text-transform: uppercase;
-              color: #64748b;
-              margin-bottom: 4px;
-            }
-            .address {
-              font-size: 12px;
-              line-height: 1.5;
-              white-space: pre-line;
-            }
-            .meta {
-              font-size: 11px;
-              color: #1e293b;
-              font-weight: 600;
-            }
-            @media print {
-              body { background: white; }
-              .label {
-                margin: 0;
-                box-shadow: none;
-                border-width: 1.5px;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="label">
-            <div class="header">
-              <div class="brand">JB & BEST</div>
-              <div class="tracking">${shipment.trackingNumber}</div>
-            </div>
-
-            <div class="qr-box">
-              ${shipment.qrCode ? `<img src="${shipment.qrCode}" alt="Tracking QR code" />` : "<div>No QR code</div>"}
-            </div>
-
-            <div class="section">
-              <div class="section-label">From</div>
-              <div class="address">${formatAddress(shipment.sender)}</div>
-            </div>
-
-            <div class="section">
-              <div class="section-label">To</div>
-              <div class="address">${formatAddress(shipment.recipient)}</div>
-            </div>
-
-            <div class="meta">Carrier: ${shipment.carrier.toUpperCase()} • Service: ${shipment.serviceLevel}</div>
-          </div>
-        </body>
-      </html>
-    `);
-
-    printWindow.document.close();
-    setTimeout(() => {
-      printWindow.focus();
-      printWindow.print();
-      printWindow.close();
-    }, 250);
-  };
 
   const handleCreateShipment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -335,16 +208,13 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
 
   const getShipmentRoute = (shipment: Shipment) => {
     if (
-      shipment.sender.country.toLowerCase() !==
-      shipment.recipient.country.toLowerCase()
+      shipment.sender.country.trim() &&
+      shipment.recipient.country.trim() &&
+      shipment.sender.country.trim().toLowerCase() !==
+        shipment.recipient.country.trim().toLowerCase()
     )
       return "International";
-    if (
-      shipment.sender.state.toLowerCase() !==
-      shipment.recipient.state.toLowerCase()
-    )
-      return "Interstate";
-    return "In-state";
+    return "Domestic";
   };
 
   const handleWarehouseScan = async (payload: string) => {
@@ -357,6 +227,14 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
       const shipment = await getShipmentByTrackingNumber(trackingId);
       const route = getShipmentRoute(shipment);
       setScannedShipment(shipment);
+      if (
+        route !== "International" &&
+        shipment.currentStatus !== "at_warehouse"
+      ) {
+        throw new Error(
+          "Domestic shipments stay with the rider for final delivery and cannot be received at the warehouse.",
+        );
+      }
       if (
         shipment.currentStatus !== "assigned" &&
         shipment.currentStatus !== "picked_up" &&
@@ -727,12 +605,43 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                       </span>
                     </div>
                     <p className="text-gray-600">
-                      📍 {p.pickupAddress.street},{" "}
+                      📍 <strong>Pickup:</strong> {p.pickupAddress.street},{" "}
                       {p.pickupAddress.suite
                         ? `${p.pickupAddress.suite}, `
                         : ""}
                       {p.pickupAddress.city} {p.pickupAddress.zip}
                     </p>
+                    {p.deliveryAddress && (
+                      <p className="text-gray-800 font-medium">
+                        🎯 <strong>Destination:</strong> {p.deliveryAddress.street},{" "}
+                        {p.deliveryAddress.city}, {p.deliveryAddress.state} {p.deliveryAddress.zip} ({p.deliveryAddress.country})
+                      </p>
+                    )}
+                    {p.directCarrierTransfer && (
+                      <div className="p-2 rounded-xl bg-amber-50 border border-amber-200/80 text-[11px] text-amber-900 font-medium">
+                        ✈️ <strong>Direct Carrier Tender:</strong> Out-of-State / International parcel. Rider tenders directly to{" "}
+                        <span className="font-bold underline">{p.carrierHubName || `${p.preferredCarrier.toUpperCase()} Hub`}</span>.
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3 flex-wrap pt-0.5 text-[11px]">
+                      <span className="font-semibold text-gray-700">
+                        Total: ${(p.totalEstimatedCost ?? 0).toFixed(2)}
+                      </span>
+                      <span className="text-gray-400">•</span>
+                      <span className="text-blue-700 font-semibold">
+                        50% Deposit: ${(p.depositAmount ?? 0).toFixed(2)}
+                      </span>
+                      <span className="text-gray-400">•</span>
+                      {p.paymentMethod === "cash_onsite" ? (
+                        <span className={`px-2 py-0.5 rounded-full font-bold ${p.paidAtRegister ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                          {p.paidAtRegister ? '✓ Cash Received at Counter' : '💵 Cash Payment Due Onsite'}
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold">
+                          ✓ 50% Deposit Paid Online
+                        </span>
+                      )}
+                    </div>
                     <p className="text-gray-500">
                       📞 {p.contactPhone} • Ready: {p.pickupDate} ({p.readyTime}{" "}
                       - {p.closeTime}) • {p.estimatedPackagesCount} boxes (

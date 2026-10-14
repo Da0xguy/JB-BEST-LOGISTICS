@@ -17,6 +17,8 @@ import {
   Briefcase,
   LayoutDashboard,
   ChevronDown,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { UserRole } from "../types";
 
@@ -27,6 +29,8 @@ interface NavbarProps {
   setPortal: (portal: "consumer" | "staff" | "admin") => void;
   userRole?: UserRole;
   setUserRole?: (role: UserRole) => void;
+  customerName?: string;
+  isCustomerAuthenticated?: boolean;
   onOpenAuth: () => void;
   onOpenArchitecture: () => void;
 }
@@ -37,6 +41,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   portal,
   setPortal,
   setUserRole,
+  customerName,
+  isCustomerAuthenticated = false,
   onOpenAuth,
   onOpenArchitecture,
 }) => {
@@ -47,6 +53,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [authRole, setAuthRole] = useState<"customer" | "staff" | "admin">(
     "customer",
   );
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
   const [authError] = useState("");
   const [isSubmittingAuth] = useState(false);
 
@@ -139,6 +146,15 @@ export const Navbar: React.FC<NavbarProps> = ({
     setIsServicesMenuOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  const handleAccountClick = () => {
+    if (isCustomerAuthenticated) handleNavClick("profile");
+    else onOpenAuth();
+  };
+
+  const accountLabel = isCustomerAuthenticated
+    ? customerName?.trim() || "My Account"
+    : "Log in";
 
   const handleSwitchPortal = (target: "consumer" | "staff" | "admin") => {
     setPortal(target);
@@ -273,11 +289,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span>Customer Care</span>
                 </a>
                 <button
-                  onClick={onOpenAuth}
+                  onClick={handleAccountClick}
                   className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 font-semibold text-white transition hover:bg-blue-700 cursor-pointer"
                 >
                   <User className="h-3.5 w-3.5" />
-                  <span>Log in</span>
+                  <span className="max-w-36 truncate">{accountLabel}</span>
                 </button>
               </>
             ) : (
@@ -384,11 +400,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <div className="pt-3 border-t border-slate-100 space-y-2 text-center text-xs text-slate-500">
             <button
-              onClick={onOpenAuth}
+              onClick={handleAccountClick}
               className="w-full py-2 px-3 bg-slate-900 hover:bg-blue-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 cursor-pointer"
             >
               <User className="w-3.5 h-3.5" />
-              <span>Log in or sign up</span>
+              <span className="max-w-full truncate">{isCustomerAuthenticated ? accountLabel : "Log in or sign up"}</span>
             </button>
             <a
               href="tel:+14045550199"
@@ -479,15 +495,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm font-normal outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                 />
               </label>
-              <label className="block text-sm font-semibold text-slate-700">
+              <label className="relative block text-sm font-semibold text-slate-700">
                 Password
                 <input
                   name="password"
                   required
-                  type="password"
+                  type={showAuthPassword ? "text" : "password"}
                   placeholder="Enter your password"
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm font-normal outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-3 pr-12 text-sm font-normal outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowAuthPassword((visible) => !visible)}
+                  aria-label={showAuthPassword ? "Hide password" : "Show password"}
+                  className="absolute right-3 top-[calc(50%+0.45rem)] -translate-y-1/2 text-slate-500 hover:text-slate-800"
+                >
+                  {showAuthPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </label>
               {authError && (
                 <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">

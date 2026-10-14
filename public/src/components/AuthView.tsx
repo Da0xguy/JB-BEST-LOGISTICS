@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import {
   ArrowLeft,
+  Eye,
+  EyeOff,
   LockKeyhole,
   Mail,
   Package,
@@ -13,7 +15,10 @@ import {
   clearAuthToken,
   login,
   register,
+  requestPasswordResetCode,
+  resetPassword,
   setAuthToken,
+  verifyRegistrationCode,
 } from "../lib/api";
 import { AuthRole } from "../lib/api";
 
@@ -37,8 +42,15 @@ export const AuthView: React.FC<AuthViewProps> = ({
   onAuthenticated,
 }) => {
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [verificationFlow, setVerificationFlow] = useState<
+    "registration" | "password_reset" | null
+  >(null);
+  const [verificationEmail, setVerificationEmail] = useState("");
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authenticatedRole, setAuthenticatedRole] = useState<AuthRole>(
     mode === "admin"
@@ -68,6 +80,9 @@ export const AuthView: React.FC<AuthViewProps> = ({
     onBack();
   };
 
+  const togglePasswordVisibility = (field: string) =>
+    setVisiblePasswords((current) => ({ ...current, [field]: !current[field] }));
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAuthError("");
@@ -76,17 +91,22 @@ export const AuthView: React.FC<AuthViewProps> = ({
     clearAuthToken();
 
     try {
-      const response =
-        isSignUp && mode === "customer"
-          ? await register(
-              String(form.get("name") || ""),
-              String(form.get("email") || ""),
-              String(form.get("password") || ""),
-            )
-          : await login(
-              String(form.get("email") || ""),
-              String(form.get("password") || ""),
-            );
+      if (isSignUp && mode === "customer") {
+        const email = String(form.get("email") || "").trim();
+        await register(
+          String(form.get("name") || ""),
+          email,
+          String(form.get("password") || ""),
+        );
+        setVerificationEmail(email);
+        setVerificationFlow("registration");
+        setAuthNotice("");
+        return;
+      }
+      const response = await login(
+        String(form.get("email") || ""),
+        String(form.get("password") || ""),
+      );
       const role = response.user.role;
       setAuthenticatedRole(role);
       const allowed =
@@ -106,6 +126,76 @@ export const AuthView: React.FC<AuthViewProps> = ({
     } catch (error) {
       setAuthError(
         error instanceof Error ? error.message : "Unable to authenticate",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRegistrationVerification = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    setAuthError("");
+    setIsSubmitting(true);
+    const form = new FormData(event.currentTarget);
+    try {
+      const response = await verifyRegistrationCode(
+        verificationEmail,
+        String(form.get("code") || ""),
+      );
+      setAuthToken(response.token);
+      setAuthenticatedRole(response.user.role);
+      completeAuthentication(response.user.role);
+    } catch (error) {
+      setAuthError(
+        error instanceof Error ? error.message : "Unable to verify your email",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    setAuthError("");
+    setAuthNotice("");
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") || "").trim();
+    setIsSubmitting(true);
+    try {
+      if (verificationFlow !== "password_reset") {
+        await requestPasswordResetCode(email);
+        setVerificationEmail(email);
+        setVerificationFlow("password_reset");
+        setAuthNotice(
+          "If an active account exists for that email, a verification code has been sent.",
+        );
+        return;
+      }
+
+      const newPassword = String(form.get("newPassword") || "");
+      if (newPassword.length < 8) {
+        setAuthError("Use at least 8 characters for your new password.");
+        return;
+      }
+      if (newPassword !== form.get("confirmPassword")) {
+        setAuthError("The passwords do not match.");
+        return;
+      }
+      await resetPassword(
+        verificationEmail,
+        String(form.get("code") || ""),
+        newPassword,
+      );
+      setIsForgotPassword(false);
+      setVerificationFlow(null);
+      setAuthNotice("Your password has been reset. You can now sign in.");
+    } catch (error) {
+      setAuthError(
+        error instanceof Error ? error.message : "Unable to reset password",
       );
     } finally {
       setIsSubmitting(false);
@@ -232,16 +322,26 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 {mode === "customer" ? "Customer account" : `${mode} portal`}
               </span>
               <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-                {isSignUp && mode === "customer"
-                  ? "Create your account"
-                  : portalTitle}
+                {verificationFlow === "registration"
+                  ? "Verify your email"
+                  : isForgotPassword
+                    ? verificationFlow === "password_reset"
+                      ? "Reset your password"
+                      : "Forgot password?"
+                    : isSignUp && mode === "customer"
+                      ? "Create your account"
+                      : portalTitle}
               </h2>
               <p className="mt-2 text-sm text-slate-500">
                 {needsPasswordChange
                   ? "Your temporary password must be changed before continuing."
-                  : mode === "customer"
-                    ? "Manage shipments, mailboxes, and receipts."
-                    : `Access the ${mode} workspace.`}
+                  : verificationFlow === "registration"
+                    ? `Enter the 6-digit code we sent to ${verificationEmail}.`
+                    : isForgotPassword
+                      ? "We’ll email you a code to securely reset your password."
+                      : mode === "customer"
+                        ? "Manage shipments, mailboxes, and receipts."
+                        : `Access the ${mode} workspace.`}
               </p>
             </div>
 
@@ -249,27 +349,47 @@ export const AuthView: React.FC<AuthViewProps> = ({
               <form onSubmit={handlePasswordChange} className="mt-6 space-y-5">
                 <label className="block text-sm font-semibold text-slate-700">
                   New password
-                  <input
-                    name="newPassword"
-                    required
-                    minLength={12}
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder="At least 12 characters"
-                    className="auth-input bg-slate-50"
-                  />
+                  <div className="relative">
+                    <input
+                      name="newPassword"
+                      required
+                      minLength={12}
+                      type={visiblePasswords.changePassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder="At least 12 characters"
+                      className="auth-input bg-slate-50 pr-12"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => togglePasswordVisibility("changePassword")}
+                      aria-label={visiblePasswords.changePassword ? "Hide password" : "Show password"}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800"
+                    >
+                      {visiblePasswords.changePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </label>
                 <label className="block text-sm font-semibold text-slate-700">
                   Confirm new password
-                  <input
-                    name="confirmPassword"
-                    required
-                    minLength={12}
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder="Enter it again"
-                    className="auth-input bg-slate-50"
-                  />
+                  <div className="relative">
+                    <input
+                      name="confirmPassword"
+                      required
+                      minLength={12}
+                      type={visiblePasswords.confirmChangePassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder="Enter it again"
+                      className="auth-input bg-slate-50 pr-12"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => togglePasswordVisibility("confirmChangePassword")}
+                      aria-label={visiblePasswords.confirmChangePassword ? "Hide password" : "Show password"}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800"
+                    >
+                      {visiblePasswords.confirmChangePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </label>
                 {authError && (
                   <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -285,6 +405,147 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   {isSubmitting
                     ? "Updating password..."
                     : "Change password and continue"}
+                </button>
+              </form>
+            ) : verificationFlow === "registration" ? (
+              <form
+                onSubmit={handleRegistrationVerification}
+                className="mt-6 space-y-5"
+              >
+                <label className="block text-sm font-semibold text-slate-700">
+                  Email verification code
+                  <input
+                    name="code"
+                    required
+                    inputMode="numeric"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    autoComplete="one-time-code"
+                    placeholder="6-digit code"
+                    className="auth-input bg-slate-50"
+                  />
+                </label>
+                {authError && (
+                  <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {authError}
+                  </p>
+                )}
+                <button
+                  disabled={isSubmitting}
+                  type="submit"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  {isSubmitting ? "Verifying..." : "Verify email and create account"}
+                </button>
+              </form>
+            ) : isForgotPassword ? (
+              <form onSubmit={handleForgotPassword} className="mt-6 space-y-5">
+                {verificationFlow !== "password_reset" ? (
+                  <label className="block text-sm font-semibold text-slate-700">
+                    Email address
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        name="email"
+                        required
+                        type="email"
+                        defaultValue={verificationEmail}
+                        placeholder="you@example.com"
+                        className="auth-input bg-slate-50 pl-10"
+                      />
+                    </div>
+                  </label>
+                ) : (
+                  <>
+                    <p className="rounded-xl bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                      Enter the code sent to {verificationEmail}.
+                    </p>
+                    <input
+                      type="hidden"
+                      name="email"
+                      value={verificationEmail}
+                    />
+                    <label className="block text-sm font-semibold text-slate-700">
+                      Verification code
+                      <input
+                        name="code"
+                        required
+                        inputMode="numeric"
+                        pattern="[0-9]{6}"
+                        maxLength={6}
+                        autoComplete="one-time-code"
+                        placeholder="6-digit code"
+                        className="auth-input bg-slate-50"
+                      />
+                    </label>
+                    <label className="block text-sm font-semibold text-slate-700">
+                      New password
+                      <div className="relative">
+                        <input
+                          name="newPassword"
+                          required
+                          minLength={8}
+                          type={visiblePasswords.resetPassword ? "text" : "password"}
+                          autoComplete="new-password"
+                          placeholder="At least 8 characters"
+                          className="auth-input bg-slate-50 pr-12"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => togglePasswordVisibility("resetPassword")}
+                          aria-label={visiblePasswords.resetPassword ? "Hide password" : "Show password"}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800"
+                        >
+                          {visiblePasswords.resetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </label>
+                    <label className="block text-sm font-semibold text-slate-700">
+                      Confirm new password
+                      <div className="relative">
+                        <input
+                          name="confirmPassword"
+                          required
+                          minLength={8}
+                          type={visiblePasswords.confirmResetPassword ? "text" : "password"}
+                          autoComplete="new-password"
+                          placeholder="Enter it again"
+                          className="auth-input bg-slate-50 pr-12"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => togglePasswordVisibility("confirmResetPassword")}
+                          aria-label={visiblePasswords.confirmResetPassword ? "Hide password" : "Show password"}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800"
+                        >
+                          {visiblePasswords.confirmResetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </label>
+                  </>
+                )}
+                {authNotice && (
+                  <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                    {authNotice}
+                  </p>
+                )}
+                {authError && (
+                  <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {authError}
+                  </p>
+                )}
+                <button
+                  disabled={isSubmitting}
+                  type="submit"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <LockKeyhole className="h-4 w-4" />
+                  {isSubmitting
+                    ? "Please wait..."
+                    : verificationFlow === "password_reset"
+                      ? "Reset password"
+                      : "Send verification code"}
                 </button>
               </form>
             ) : (
@@ -309,6 +570,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                       name="email"
                       required
                       type="email"
+                      defaultValue={verificationEmail}
                       placeholder="you@example.com"
                       className="auth-input bg-slate-50 pl-10"
                     />
@@ -316,19 +578,49 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 </label>
                 <label className="block text-sm font-semibold text-slate-700">
                   Password
-                  <input
-                    name="password"
-                    required
-                    minLength={isSignUp && mode === "customer" ? 8 : undefined}
-                    type="password"
-                    placeholder="Enter your password"
-                    className="auth-input bg-slate-50"
-                  />
+                  <div className="relative">
+                    <input
+                      name="password"
+                      required
+                      minLength={isSignUp && mode === "customer" ? 8 : undefined}
+                      type={visiblePasswords.login ? "text" : "password"}
+                      autoComplete={isSignUp ? "new-password" : "current-password"}
+                      placeholder="Enter your password"
+                      className="auth-input bg-slate-50 pr-12"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => togglePasswordVisibility("login")}
+                      aria-label={visiblePasswords.login ? "Hide password" : "Show password"}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800"
+                    >
+                      {visiblePasswords.login ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </label>
+                {mode === "customer" && !isSignUp && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsForgotPassword(true);
+                      setVerificationFlow(null);
+                      setAuthError("");
+                      setAuthNotice("");
+                    }}
+                    className="-mt-2 w-full text-right text-sm font-semibold text-blue-700 hover:text-blue-900"
+                  >
+                    Forgot password?
+                  </button>
+                )}
                 {authError && (
                   <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
                     {authError}
                   </p>
+                )}
+                {authNotice && (
+                    <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                      {authNotice}
+                    </p>
                 )}
                 <button
                   disabled={isSubmitting}
@@ -346,16 +638,51 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 </button>
               </form>
             )}
-            {mode === "customer" && (
+            {mode === "customer" &&
+              verificationFlow === "registration" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVerificationFlow(null);
+                    setVerificationEmail("");
+                    setAuthError("");
+                  }}
+                  className="mt-5 w-full text-center text-sm font-semibold text-blue-700 hover:text-blue-900"
+                >
+                  Back to account details
+                </button>
+              )}
+            {mode === "customer" && isForgotPassword && (
               <button
-                onClick={() => setIsSignUp((value) => !value)}
+                type="button"
+                onClick={() => {
+                  setIsForgotPassword(false);
+                  setVerificationFlow(null);
+                  setAuthError("");
+                  setAuthNotice("");
+                }}
+                className="mt-5 w-full text-center text-sm font-semibold text-blue-700 hover:text-blue-900"
+              >
+                Back to sign in
+              </button>
+            )}
+            {mode === "customer" &&
+              !needsPasswordChange &&
+              !isForgotPassword &&
+              verificationFlow !== "registration" && (
+              <button
+                onClick={() => {
+                  setIsSignUp((value) => !value);
+                  setAuthError("");
+                  setAuthNotice("");
+                }}
                 className="mt-5 w-full text-center text-sm font-semibold text-blue-700 hover:text-blue-900"
               >
                 {isSignUp
                   ? "Already have an account? Log in"
                   : "New here? Create an account"}
               </button>
-            )}
+              )}
             <p className="mt-10 flex items-center justify-center gap-2 text-xs text-slate-400">
               <User className="h-3.5 w-3.5" /> Secure access for your JB & Best
               account.

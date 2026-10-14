@@ -150,10 +150,31 @@ export const login = (email: string, password: string) =>
   });
 
 export const register = (name: string, email: string, password: string) =>
-  apiRequest<{ token: string; user: { role: AuthRole; mustChangePassword: boolean } }>('/api/auth/register', {
+  apiRequest<{ message: string }>('/api/auth/register', {
     method: 'POST',
     auth: false,
     body: JSON.stringify({ name, email, password }),
+  });
+
+export const verifyRegistrationCode = (email: string, code: string) =>
+  apiRequest<{ token: string; user: { role: AuthRole; mustChangePassword: boolean } }>('/api/auth/register/verify', {
+    method: 'POST',
+    auth: false,
+    body: JSON.stringify({ email, code }),
+  });
+
+export const requestPasswordResetCode = (email: string) =>
+  apiRequest<{ message: string }>('/api/auth/forgot-password', {
+    method: 'POST',
+    auth: false,
+    body: JSON.stringify({ email }),
+  });
+
+export const resetPassword = (email: string, code: string, password: string) =>
+  apiRequest<{ message: string }>('/api/auth/reset-password', {
+    method: 'POST',
+    auth: false,
+    body: JSON.stringify({ email, code, password }),
   });
 
 export const getCurrentUser = () =>
@@ -236,7 +257,11 @@ export const bookPickupShipment = (booking: {
   deliveryLocation: { type: 'Point'; coordinates: [number, number] };
   appointmentWindow: { start: string; end: string; slot: string };
 }) =>
-  apiRequest<{ trackingNumber: string; shipment: StoredShipment }>('/api/v1/shipments/book', {
+  apiRequest<{
+    trackingNumber: string;
+    shipment: StoredShipment;
+    emailNotifications?: Array<{ recipient: 'customer' | 'admin'; status: 'sent' | 'failed' }>;
+  }>('/api/v1/shipments/book', {
     method: 'POST',
     body: JSON.stringify(booking),
   });
