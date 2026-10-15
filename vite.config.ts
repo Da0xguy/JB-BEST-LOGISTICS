@@ -6,6 +6,7 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     root: path.resolve(__dirname, 'public'),
+    envDir: path.resolve(__dirname),
     publicDir: path.resolve(__dirname, 'public/assets'),
     build: {
       outDir: path.resolve(__dirname, 'dist'),
