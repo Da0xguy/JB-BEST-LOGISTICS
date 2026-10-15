@@ -65,7 +65,7 @@ export async function sendMail(to: string, subject: string, html: string): Promi
       const providerMessage = responseBody.message || responseBody.name || '';
       const message = /domain is not verified/i.test(providerMessage)
         ? 'The Resend sender domain is not verified. Verify your domain in Resend and set RESEND_FROM_EMAIL to an address at that domain.'
-        : `Resend rejected the email (HTTP ${response.status}). Check the Resend API key and sender configuration.`;
+        : `Resend rejected the email (HTTP ${response.status}): ${providerMessage || 'Check the Resend API key and sender configuration.'}`;
       throw new EmailDeliveryError(message);
     }
     if (!responseBody.id) throw new Error('Resend accepted the request but returned no message ID.');
