@@ -1,6 +1,7 @@
 import type { Appointment, Carrier, PickupRequest, Shipment, ShipmentStatus } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_URL = import.meta.env.VITE_API_URL
+  || (import.meta.env.DEV ? 'http://localhost:4000' : 'https://jb-best-logistics.onrender.com');
 
 export type AuthRole = 'customer' | 'rider' | 'warehouse' | 'warehouse_staff' | 'admin';
 export type ProvisionableRole = Extract<AuthRole, 'admin' | 'rider' | 'warehouse'>;

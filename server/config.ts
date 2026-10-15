@@ -1,6 +1,10 @@
 import 'dotenv/config';
 
-const configuredClientOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:3000')
+const productionClientOrigin = 'https://jb-best-logistics.vercel.app';
+const defaultClientOrigin = process.env.NODE_ENV === 'production'
+  ? productionClientOrigin
+  : 'http://localhost:3000';
+const configuredClientOrigins = (process.env.CLIENT_ORIGIN || defaultClientOrigin)
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -25,7 +29,11 @@ export const config = {
   port: Number(process.env.PORT || 4000),
   mongoUri,
   jwtSecret: required('JWT_SECRET', 'development-only-change-me'),
-  clientOrigin: configuredClientOrigins[0] || 'http://localhost:3000',
-  clientOrigins: [...new Set([...configuredClientOrigins, ...developmentClientOrigins])],
+  clientOrigin: configuredClientOrigins[0] || defaultClientOrigin,
+  clientOrigins: [...new Set([
+    ...configuredClientOrigins,
+    productionClientOrigin,
+    ...developmentClientOrigins,
+  ])],
   paystackSecret: process.env.PAYSTACK_SECRET_KEY || '',
 };
