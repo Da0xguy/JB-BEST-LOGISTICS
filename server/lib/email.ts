@@ -9,6 +9,13 @@ const hasResendSettings = () => Boolean(resendApiKey() || resendFromEmail());
 const hasSmtpSettings = () =>
   Boolean(process.env.SMTP_HOST?.trim() && process.env.SMTP_USER?.trim() && process.env.SMTP_PASS);
 
+export class EmailDeliveryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'EmailDeliveryError';
+  }
+}
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT) || 587,
@@ -55,7 +62,11 @@ export async function sendMail(to: string, subject: string, html: string): Promi
       name?: string;
     };
     if (!response.ok) {
-      throw new Error(`Resend rejected the email (${response.status}): ${responseBody.message || responseBody.name || 'provider error'}`);
+      const providerMessage = responseBody.message || responseBody.name || '';
+      const message = /domain is not verified/i.test(providerMessage)
+        ? 'The Resend sender domain is not verified. Verify your domain in Resend and set RESEND_FROM_EMAIL to an address at that domain.'
+        : `Resend rejected the email (HTTP ${response.status}). Check the Resend API key and sender configuration.`;
+      throw new EmailDeliveryError(message);
     }
     if (!responseBody.id) throw new Error('Resend accepted the request but returned no message ID.');
     console.log(`Email accepted by Resend: ${responseBody.id}`);

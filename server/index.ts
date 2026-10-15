@@ -16,7 +16,7 @@ import { ApiError } from './controllers/apiError';
 import v1Router from './routes/v1';
 import { emitToShipment, initializeRealtime } from './realtime';
 import { dispatchQueuedShipments } from './services/dispatchService';
-import { isEmailConfigured, sendMail } from './lib/email';
+import { EmailDeliveryError, isEmailConfigured, sendMail } from './lib/email';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -461,6 +461,7 @@ app.get('/api/reports/summary', requireAuth, allowRoles('admin', 'warehouse', 'w
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(error);
   if (error instanceof ApiError) return res.status(error.statusCode).json({ error: error.message });
+  if (error instanceof EmailDeliveryError) return res.status(502).json({ error: error.message });
   if (error instanceof mongoose.Error.ValidationError) return res.status(400).json({ error: 'Validation failed', details: Object.values(error.errors).map((item) => item.message) });
   if (error && typeof error === 'object' && 'code' in error && error.code === 11000) return res.status(409).json({ error: 'A record with these unique values already exists' });
   return res.status(500).json({ error: 'Internal server error' });
