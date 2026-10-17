@@ -56,7 +56,7 @@ All protected endpoints use `Authorization: Bearer <jwt>`. Customer registration
 
 Helmet, CORS allowlisting, request rate limiting, bcrypt password hashing, JWT expiry, suspended-account checks, role middleware, audit activity logs, and Mongoose validation are enabled. Payment webhooks should continue to verify Paystack signatures before marking payments as paid.
 
-`CLIENT_ORIGIN` accepts a comma-separated origin allowlist. In non-production, `http://localhost:3000` and `http://localhost:3001` are also allowed for Vite's automatic port fallback. Restart the API after changing this setting.
+`CLIENT_ORIGIN` accepts a comma-separated origin allowlist. `http://localhost:3000` and `http://localhost:3001` are also allowed in production so a local frontend can connect to the deployed API during development. Restart or redeploy the API after changing this setting.
 
 ## Next integration steps
 

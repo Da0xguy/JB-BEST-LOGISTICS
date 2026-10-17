@@ -8,9 +8,8 @@ const configuredClientOrigins = (process.env.CLIENT_ORIGIN || defaultClientOrigi
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
-const developmentClientOrigins = process.env.NODE_ENV === 'production'
-  ? []
-  : ['http://localhost:3000', 'http://localhost:3001'];
+// Keep local frontend origins available when testing against the deployed API.
+const localClientOrigins = ['http://localhost:3000', 'http://localhost:3001'];
 
 const mongoUri = process.env.MONGODB_URI?.trim();
 if (!mongoUri) {
@@ -33,7 +32,7 @@ export const config = {
   clientOrigins: [...new Set([
     ...configuredClientOrigins,
     productionClientOrigin,
-    ...developmentClientOrigins,
+    ...localClientOrigins,
   ])],
   paystackSecret: process.env.PAYSTACK_SECRET_KEY || '',
 };
