@@ -42,8 +42,15 @@ export interface CustomerMailboxProfile {
   companyName?: string;
   keyFobId?: string;
   renewalDate: string;
-  status: 'active' | 'suspended';
+  status: 'pending' | 'active' | 'suspended';
   packagesHeld: number;
+}
+
+export interface CustomerActivity {
+  id: string;
+  action: string;
+  description: string;
+  createdAt: string;
 }
 
 export interface WarehouseMailboxProfile extends CustomerMailboxProfile {
@@ -215,7 +222,13 @@ export const deleteStaffAccount = (userId: string) =>
   });
 
 export const getCustomerProfile = () =>
-  apiRequest<{ profile: CustomerProfile; mailboxes: CustomerMailboxProfile[] }>('/api/customer/profile');
+  apiRequest<{ profile: CustomerProfile; mailboxes: CustomerMailboxProfile[]; activities: CustomerActivity[] }>('/api/customer/profile');
+
+export const requestCustomerMailbox = (mailbox: { plan: CustomerMailboxProfile['plan']; companyName?: string }) =>
+  apiRequest<{ mailbox: CustomerMailboxProfile; emailSent: boolean }>('/api/customer/mailboxes', {
+    method: 'POST',
+    body: JSON.stringify(mailbox),
+  });
 
 export const saveCustomerProfile = (profile: Omit<CustomerProfile, 'email'>) =>
   apiRequest<{ profile: CustomerProfile }>('/api/customer/profile', {

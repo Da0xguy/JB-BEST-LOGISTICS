@@ -113,6 +113,9 @@ const createTrackingId = async () => {
 
 const logActivity = (req: AuthRequest, action: string, resource: string, resourceId?: string, metadata?: unknown) =>
   ActivityLog.create({ actorId: req.user?._id, action, resource, resourceId, ip: req.ip, metadata });
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+} as Record<string, string>)[character]);
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'jb-best-logistics-api' }));
 
@@ -192,6 +195,13 @@ app.get('/api/auth/me', requireAuth, (req: AuthRequest, res) => res.json({ user:
 app.get('/api/customer/profile', requireAuth, allowRoles('customer'), asyncRoute(async (req: AuthRequest, res) => {
   const user = req.user!;
   const mailboxes = await MailboxProfile.find({ customerId: user._id }).sort({ createdAt: -1 }).lean();
+  const mailboxIds = mailboxes.map((mailbox) => mailbox._id.toString());
+  const activityRecords = await ActivityLog.find({
+    $or: [
+      { actorId: user._id },
+      { resource: 'mailbox_profile', resourceId: { $in: mailboxIds } },
+    ],
+  }).sort({ createdAt: -1 }).limit(20).lean();
   return res.json({
     profile: {
       name: user.name,
@@ -209,6 +219,71 @@ app.get('/api/customer/profile', requireAuth, allowRoles('customer'), asyncRoute
       status: mailbox.status,
       packagesHeld: mailbox.packagesHeld,
     })),
+    activities: activityRecords.map((activity) => ({
+      id: activity._id.toString(),
+      action: activity.action,
+      description: (() => {
+        const metadata = activity.metadata as { mailboxNumber?: string; trackingId?: string; serviceType?: string } | undefined;
+        if (activity.resource === 'mailbox_profile') return `Mailbox ${String(metadata?.mailboxNumber || '')} ${activity.action === 'create' ? 'requested or assigned' : activity.action}`;
+        if (activity.resource === 'customer_profile') return 'Customer profile updated';
+        if (activity.resource === 'shipment') return `Shipment ${activity.action}${metadata?.trackingId ? ` (${metadata.trackingId})` : ''}`;
+        if (activity.resource === 'appointment') return `Appointment booked${metadata?.serviceType ? `: ${metadata.serviceType.replace(/_/g, ' ')}` : ''}`;
+        if (activity.resource === 'user' && activity.action === 'login') return 'Signed in';
+        return `${activity.resource.replace(/_/g, ' ')} ${activity.action.replace(/_/g, ' ')}`;
+      })(),
+      createdAt: activity.createdAt.toISOString(),
+    })),
+  });
+}));
+
+app.post('/api/customer/mailboxes', requireAuth, allowRoles('customer'), asyncRoute(async (req: AuthRequest, res) => {
+  const body = req.body as { plan?: 'personal' | 'business' | 'corporate'; companyName?: string };
+  if (!['personal', 'business', 'corporate'].includes(body.plan || '')) {
+    return res.status(400).json({ error: 'Choose a valid mailbox plan' });
+  }
+  const companyName = typeof body.companyName === 'string' ? body.companyName.trim().slice(0, 120) : '';
+  if (body.plan !== 'personal' && !companyName) {
+    return res.status(400).json({ error: 'Enter a company name for business and corporate mailbox requests' });
+  }
+
+  const user = req.user!;
+  const mailboxNumber = `REQUEST-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+  const renewalDate = new Date();
+  renewalDate.setFullYear(renewalDate.getFullYear() + 1);
+  const mailbox = await MailboxProfile.create({
+    mailboxNumber,
+    customerId: user._id,
+    createdBy: user._id,
+    plan: body.plan,
+    companyName: companyName || undefined,
+    renewalDate,
+    status: 'pending',
+  });
+  await logActivity(req, 'create', 'mailbox_profile', mailbox._id.toString(), { mailboxNumber, plan: mailbox.plan });
+
+  let emailSent = false;
+  try {
+    await sendMail(
+      user.email,
+      'Mailbox request received - JB & Best Logistics',
+      `<p>Hello ${escapeHtml(user.name)},</p><p>We received your ${mailbox.plan} mailbox request.</p><p>Request reference: <strong>${mailboxNumber}</strong></p><p>Our team will review your request and contact you about completing setup.</p>`,
+    );
+    emailSent = true;
+  } catch (error) {
+    console.error('Mailbox request confirmation email failed:', error instanceof Error ? error.message : error);
+  }
+
+  return res.status(201).json({
+    mailbox: {
+      id: mailbox._id.toString(),
+      mailboxNumber: mailbox.mailboxNumber,
+      plan: mailbox.plan,
+      companyName: mailbox.companyName,
+      renewalDate: mailbox.renewalDate.toISOString().slice(0, 10),
+      status: mailbox.status,
+      packagesHeld: mailbox.packagesHeld,
+    },
+    emailSent,
   });
 }));
 
@@ -249,6 +324,7 @@ app.put('/api/customer/profile', requireAuth, allowRoles('customer'), asyncRoute
     ...(body.location ? { location: body.location } : {}),
   }];
   await user.save();
+  await logActivity(req, 'update', 'customer_profile', user._id.toString());
   return res.json({
     profile: {
       name: user.name,

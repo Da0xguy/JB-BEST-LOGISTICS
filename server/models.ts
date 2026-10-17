@@ -135,7 +135,7 @@ export interface MailboxProfileDocument extends Document {
   companyName?: string;
   keyFobId?: string;
   renewalDate: Date;
-  status: 'active' | 'suspended';
+  status: 'pending' | 'active' | 'suspended';
   packagesHeld: number;
   createdAt: Date;
   updatedAt: Date;
@@ -149,7 +149,7 @@ const mailboxProfileSchema = new Schema<MailboxProfileDocument>({
   companyName: { type: String, trim: true },
   keyFobId: { type: String, trim: true },
   renewalDate: { type: Date, required: true },
-  status: { type: String, enum: ['active', 'suspended'], default: 'active' },
+  status: { type: String, enum: ['pending', 'active', 'suspended'], default: 'active' },
   packagesHeld: { type: Number, min: 0, default: 0 },
 }, { timestamps: true });
 

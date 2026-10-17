@@ -27,7 +27,8 @@ To bootstrap the first admin, set `MONGODB_URI`, `BOOTSTRAP_ADMIN_NAME`, and `BO
 - `GET /api/jobs` rider and operations job queue
 - `GET /api/notifications` in-app notification feed
 - `GET /api/reports/summary` operations summary report
-- `GET /api/customer/profile` and `PUT /api/customer/profile` read and update a customer's saved contact details, default address, and optional GeoJSON location.
+- `GET /api/customer/profile` and `PUT /api/customer/profile` read and update a customer's saved contact details, default address, optional GeoJSON location, mailbox profiles, and recent account activity.
+- `POST /api/customer/mailboxes` creates a pending mailbox request and emails a confirmation to the signed-in customer.
 
 ## Versioned logistics API
 

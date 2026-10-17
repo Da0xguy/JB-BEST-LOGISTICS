@@ -6,7 +6,9 @@ import {
   getAuthToken,
   getCurrentUser,
   getCustomerProfile,
+  requestCustomerMailbox,
   saveCustomerProfile,
+  type CustomerActivity,
 } from "../lib/api";
 
 interface CustomerProfileViewProps {
@@ -26,6 +28,8 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
   const [isLocating, setIsLocating] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [activities, setActivities] = useState<CustomerActivity[]>([]);
+  const [isRequestingMailbox, setIsRequestingMailbox] = useState(false);
   const [location, setLocation] =
     useState<CustomerProfile["address"]["location"]>();
 
@@ -47,10 +51,11 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
         }
         return getCustomerProfile();
       })
-      .then(({ profile: savedProfile, mailboxes }) => {
+      .then(({ profile: savedProfile, mailboxes, activities: recentActivities }) => {
         if (!isCurrent) return;
         const fullProfile = { ...savedProfile, mailboxes };
         setProfile(fullProfile);
+        setActivities(recentActivities);
         setLocation(savedProfile.address.location);
         onProfileSaved(fullProfile);
       })
@@ -121,6 +126,8 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
       setProfile(fullProfile);
       setLocation(result.profile.address.location);
       onProfileSaved(fullProfile);
+      const latest = await getCustomerProfile();
+      setActivities(latest.activities);
       setNotice(
         "Profile saved. Your details will be ready the next time you book.",
       );
@@ -132,6 +139,35 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
       );
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleMailboxRequest = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!profile) return;
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    setError("");
+    setNotice("");
+    setIsRequestingMailbox(true);
+    try {
+      const result = await requestCustomerMailbox({
+        plan: String(form.get("mailboxPlan")) as "personal" | "business" | "corporate",
+        companyName: String(form.get("companyName") || "").trim() || undefined,
+      });
+      const latest = await getCustomerProfile();
+      const fullProfile = { ...latest.profile, mailboxes: latest.mailboxes };
+      setProfile(fullProfile);
+      setActivities(latest.activities);
+      onProfileSaved(fullProfile);
+      formElement.reset();
+      setNotice(result.emailSent
+        ? "Mailbox request submitted. A confirmation email was sent to your account email."
+        : "Mailbox request submitted, but we could not send the confirmation email. Please contact support.");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to submit mailbox request");
+    } finally {
+      setIsRequestingMailbox(false);
     }
   };
 
@@ -343,6 +379,24 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
       </form>
       <section className="border-y border-gray-200 bg-white py-6">
         <h2 className="font-semibold text-gray-900">Mailbox profiles</h2>
+        <form onSubmit={handleMailboxRequest} className="mt-4 grid gap-3 rounded-lg bg-gray-50 p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+          <label className="text-sm font-medium text-gray-700">
+            Mailbox plan
+            <select name="mailboxPlan" required className={inputClass}>
+              <option value="personal">Personal</option>
+              <option value="business">Business</option>
+              <option value="corporate">Corporate</option>
+            </select>
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Company name <span className="font-normal text-gray-500">(for business/corporate)</span>
+            <input name="companyName" className={inputClass} maxLength={120} />
+          </label>
+          <button type="submit" disabled={isRequestingMailbox} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+            {isRequestingMailbox ? "Submitting..." : "Request mailbox"}
+          </button>
+        </form>
+        <p className="mt-2 text-xs text-gray-500">Requests stay pending until our team completes mailbox setup.</p>
         {profile.mailboxes?.length ? (
           <div className="mt-3 divide-y divide-gray-100">
             {profile.mailboxes.map((mailbox) => (
@@ -377,6 +431,19 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
             No mailbox profile has been assigned to your account.
           </p>
         )}
+      </section>
+      <section className="border-y border-gray-200 bg-white py-6">
+        <h2 className="font-semibold text-gray-900">Recent activity</h2>
+        {activities.length ? (
+          <ol className="mt-3 divide-y divide-gray-100">
+            {activities.map((activity) => (
+              <li key={activity.id} className="flex flex-wrap justify-between gap-2 py-3 text-sm">
+                <span className="text-gray-700">{activity.description}</span>
+                <time className="text-xs text-gray-500" dateTime={activity.createdAt}>{new Date(activity.createdAt).toLocaleString()}</time>
+              </li>
+            ))}
+          </ol>
+        ) : <p className="mt-2 text-sm text-gray-500">No recent activity yet.</p>}
       </section>
     </section>
   );
