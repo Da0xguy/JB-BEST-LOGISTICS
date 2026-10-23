@@ -17,6 +17,7 @@ import {
   ExternalLink,
   History,
 } from "lucide-react";
+import { DashboardSidebar } from "../DashboardSidebar";
 import { apiRequest, getShipmentByTrackingNumber } from "../../lib/api";
 import {
   Shipment,
@@ -319,7 +320,22 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <div className="flex items-start gap-5 animate-in fade-in duration-200">
+      <DashboardSidebar
+        title="Staff Workspace"
+        activeItem={activeStaffTab}
+        onSelect={(tab) => setActiveStaffTab(tab as typeof activeStaffTab)}
+        items={[
+          { id: "intake", label: "Counter Intake & Labels", icon: Box },
+          { id: "pickups", label: `Doorstep Pickups (${pickups.length})`, icon: Truck },
+          { id: "scanner", label: "Milestone Scanner", icon: QrCode },
+          { id: "appointments", label: `Appointments (${appointments.length})`, icon: Calendar },
+          { id: "manifest", label: "5:30 PM Carrier Manifest", icon: Clock },
+          { id: "mailboxes", label: "Mailbox Profiles", icon: User },
+          { id: "history", label: "History", icon: History },
+        ]}
+      />
+      <div className="min-w-0 flex-1 space-y-8">
       <header>
         <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
           Warehouse workspace
@@ -328,44 +344,6 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
           Warehouse operations
         </h1>
       </header>
-      {/* Staff Operational Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-gray-200 overflow-x-auto pb-px">
-        {[
-          { id: "intake", label: "Counter Intake & Labels", icon: Box },
-          {
-            id: "pickups",
-            label: `Doorstep Pickups (${pickups.length})`,
-            icon: Truck,
-          },
-          { id: "scanner", label: "Milestone Scanner", icon: QrCode },
-          {
-            id: "appointments",
-            label: `Appointments (${appointments.length})`,
-            icon: Calendar,
-          },
-          { id: "manifest", label: "5:30 PM Carrier Manifest", icon: Clock },
-          { id: "mailboxes", label: "Mailbox Profiles", icon: User },
-          { id: "history", label: "History", icon: History },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeStaffTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveStaffTab(tab.id as any)}
-              className={`px-4 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
-                isActive
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300"
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
       {activeStaffTab === "mailboxes" && <WarehouseMailboxView />}
       {activeStaffTab === "history" && <WarehouseHistoryView />}
 
@@ -1259,6 +1237,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

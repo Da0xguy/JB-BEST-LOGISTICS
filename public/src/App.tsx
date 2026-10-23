@@ -753,7 +753,7 @@ export default function App() {
             <>
               {/* Consumer Welcome Hero (Displayed on the Home & Services view) */}
               {activeTab === "services" && (
-                <section className="landing-hero relative mb-8 min-h-[560px] overflow-hidden shadow-lg sm:min-h-[620px] lg:min-h-[calc(100svh-4rem)] lg:max-h-[760px]">
+                <section className="landing-hero relative mb-0 min-h-[calc(100svh-4rem)] overflow-hidden shadow-lg sm:mb-8 sm:min-h-[620px] lg:min-h-[calc(100svh-4rem)] lg:max-h-[760px]">
                   <img
                     src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1800&q=85"
                     alt="Packages ready for worldwide shipping"
@@ -762,7 +762,7 @@ export default function App() {
                   <div className="absolute inset-0 bg-slate-950/70" />
                   <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/60 to-slate-950/20" />
 
-                  <div className="relative z-10 flex min-h-[560px] max-w-4xl flex-col justify-center space-y-5 p-6 sm:min-h-[620px] sm:p-10 lg:min-h-[calc(100svh-4rem)] lg:p-14 animate-fade-up">
+                  <div className="relative z-10 flex min-h-[calc(100svh-4rem)] max-w-4xl flex-col justify-center space-y-5 p-6 sm:min-h-[620px] sm:p-10 lg:min-h-[calc(100svh-4rem)] lg:p-14 animate-fade-up">
                     <h1 className="max-w-4xl text-4xl font-display font-bold text-white tracking-tight leading-[1.05] sm:text-5xl lg:text-6xl">
                       Shipping, Packing & Notary{" "}
                       <span className="text-cyan-600">Made Simple</span>.

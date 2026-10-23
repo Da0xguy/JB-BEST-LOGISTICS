@@ -31,6 +31,7 @@ import {
   Banknote,
   Navigation,
 } from "lucide-react";
+import { DashboardSidebar } from "../DashboardSidebar";
 import {
   Shipment,
   Invoice,
@@ -522,7 +523,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <div className="flex items-start gap-5 animate-in fade-in duration-200">
+      <DashboardSidebar
+        title="Admin Console"
+        activeItem={activeAdminTab}
+        onSelect={(tab) => setActiveAdminTab(tab as typeof activeAdminTab)}
+        items={[
+          { id: "kpis", label: "Executive Analytics", icon: BarChart3 },
+          { id: "dispatch", label: `Auto-Dispatch Hub (${localPickups.filter((p) => !p.assignedDriverId).length} open)`, icon: Zap },
+          { id: "activities", label: `Staff Activity Monitor (${staffActivities.length})`, icon: Activity },
+          { id: "staff", label: "Team & Accounts", icon: Users },
+          { id: "shipments", label: "Shipments & Manifests", icon: Package },
+          { id: "invoices", label: "Billing & Invoices", icon: Receipt },
+        ]}
+      />
+      <div className="min-w-0 flex-1 space-y-8">
       {/* Top Executive KPI Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-3xl border border-gray-200/80 p-5 shadow-xs space-y-2">
@@ -594,45 +609,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {adminUsers.length} total staff accounts provisioned
           </p>
         </div>
-      </div>
-
-      {/* Admin Module Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-gray-200 overflow-x-auto pb-px">
-        {[
-          { id: "kpis", label: "Executive Analytics", icon: BarChart3 },
-          {
-            id: "dispatch",
-            label: `Auto-Dispatch Hub (${
-              localPickups.filter((p) => !p.assignedDriverId).length
-            } open)`,
-            icon: Zap,
-          },
-          {
-            id: "activities",
-            label: `Staff Activity Monitor (${staffActivities.length})`,
-            icon: Activity,
-          },
-          { id: "staff", label: "Team & Accounts", icon: Users },
-          { id: "shipments", label: "Shipments & Manifests", icon: Package },
-          { id: "invoices", label: "Billing & Invoices", icon: Receipt },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeAdminTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveAdminTab(tab.id as any)}
-              className={`px-4 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
-                isActive
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300"
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
       </div>
 
       {/* MODULE: Automated Pickup Dispatch Hub */}
@@ -1602,6 +1578,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };
