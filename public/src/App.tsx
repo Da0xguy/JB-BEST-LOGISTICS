@@ -713,7 +713,9 @@ export default function App() {
           className={`flex-1 w-full mx-auto ${
             portal === "consumer"
               ? "max-w-none px-0 py-0"
-              : "max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8"
+              : portal === "staff" || portal === "admin"
+                ? "max-w-none px-0 py-0"
+                : "max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8"
           }`}
         >
           {/* ======================================================================= */}

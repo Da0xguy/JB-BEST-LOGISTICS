@@ -33,7 +33,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 
   return (
     <aside
-      className={`sticky top-6 flex h-[calc(100vh-3rem)] shrink-0 flex-col rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition-[width] duration-200 ${collapsed ? "w-[4.5rem]" : "w-64"}`}
+      className={`sticky top-16 flex h-[calc(100svh-4rem)] shrink-0 flex-col border-r border-slate-200 bg-white p-3 transition-[width] duration-200 ${collapsed ? "w-[4.5rem]" : "w-64"}`}
       aria-label={`${title} navigation`}
     >
       <div className={`mb-5 flex items-center ${collapsed ? "justify-center" : "justify-between px-1"}`}>

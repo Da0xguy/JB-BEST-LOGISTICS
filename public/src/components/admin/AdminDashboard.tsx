@@ -523,7 +523,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   return (
-    <div className="flex items-start gap-5 animate-in fade-in duration-200">
+    <div className="flex min-h-[calc(100svh-4rem)] items-stretch gap-0 animate-in fade-in duration-200">
       <DashboardSidebar
         title="Admin Console"
         activeItem={activeAdminTab}
@@ -537,7 +537,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           { id: "invoices", label: "Billing & Invoices", icon: Receipt },
         ]}
       />
-      <div className="min-w-0 flex-1 space-y-8">
+      <div className="min-w-0 flex-1 space-y-8 p-4 sm:p-6 lg:p-8">
       {/* Top Executive KPI Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-3xl border border-gray-200/80 p-5 shadow-xs space-y-2">
