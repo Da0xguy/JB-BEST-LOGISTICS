@@ -663,7 +663,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 })`,
               },
               {
-              {
                 id: "cash_onsite",
                 label: `Onsite Cash Payments (${
                   localPickups.filter((p) => p.paymentMethod === "cash_onsite")
