@@ -408,7 +408,7 @@ export const AppointmentBookingView: React.FC<AppointmentBookingViewProps> = ({
                     required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="(404) 555-0199"
+                    placeholder="+1 949-844-1280"
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-600 focus:bg-white focus:outline-none"
                   />
                 </div>
@@ -480,15 +480,15 @@ export const AppointmentBookingView: React.FC<AppointmentBookingViewProps> = ({
 
             <div className="rounded-[24px] border border-gray-200 bg-white p-4 text-xs text-gray-600 space-y-2">
               <p>
-                <strong>Location:</strong> 2450 Piedmont Rd NE, Atlanta, GA
-                30324
+                <strong>Location:</strong> 1900 The Exchange SE, Suite 500, Atlanta, GA
+                30339
               </p>
               <p>
                 <strong>Parking:</strong> Free customer parking right outside
                 the storefront.
               </p>
               <p>
-                <strong>Hours:</strong> Monday–Saturday, 9:00 AM–6:00 PM
+                <strong>Hours:</strong> Monday–Saturday, 8:00 AM–9:00 PM; Sunday, 12:00 PM–8:00 PM
               </p>
             </div>
 

@@ -188,6 +188,18 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
           "Choose a future pickup date and a closing time after the ready time."
         );
       }
+      const pickupDay = windowStart.getDay();
+      const toMinutes = (time: string) => {
+        const [hours, minutes] = time.split(":").map(Number);
+        return hours * 60 + minutes;
+      };
+      const openingTime = pickupDay === 0 ? 12 * 60 : 8 * 60;
+      const closingTime = pickupDay === 0 ? 20 * 60 : 21 * 60;
+      if (toMinutes(readyTime) < openingTime || toMinutes(closeTime) > closingTime) {
+        throw new Error(pickupDay === 0
+          ? "Sunday pickup hours are 12:00 PM to 8:00 PM."
+          : "Monday through Saturday pickup hours are 8:00 AM to 9:00 PM.");
+      }
 
       let bookingId = `PKP-${Date.now().toString().slice(-6)}`;
       let customerIdVal = `cust-${Math.floor(100 + Math.random() * 900)}`;
@@ -781,7 +793,7 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
             </div>
           </div>
 
-          {/* STEP 5: 50% Deposit & Payment Options (Including Onsite Cash) */}
+          {/* STEP 5: 50% Deposit & Payment Options */}
           <div className="space-y-4 pt-3 border-t border-gray-100">
             <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
               <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs flex items-center justify-center font-bold">
@@ -804,7 +816,7 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
                   <CreditCard className="w-4 h-4 text-blue-600" />
                   <span className="text-xs font-bold text-gray-900">Card Online</span>
                 </div>
-                <p className="text-[11px] text-gray-500">Pay 50% deposit now via Card</p>
+                <p className="text-[11px] text-gray-500">Pay 50% deposit now</p>
               </button>
 
               <button
@@ -820,7 +832,7 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
                   <span className="text-xs font-bold text-gray-900">Paystack</span>
                 </div>
-                <p className="text-[11px] text-gray-500">Pay 50% deposit with Paystack</p>
+                <p className="text-[11px] text-gray-500">Pay 50% deposit now</p>
               </button>
 
               <button
@@ -849,9 +861,9 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
                 <p className="text-emerald-800 leading-relaxed">
                   You are welcome to pay cash in person at our physical retail counter:
                   <br />
-                  <strong className="text-emerald-950">2450 Piedmont Rd NE, Atlanta, GA 30324</strong>.
+                  <strong className="text-emerald-950">1900 The Exchange SE, Suite 500, Atlanta, GA 30339</strong>.
                   <br />
-                  A 50% deposit cash voucher is created upon booking, and our counter associate will stamp your receipt upon payment.
+                  A 50% deposit confirms your driver reservation. The remaining 50% balance is collected upon collection or arrival.
                 </p>
               </div>
             )}
@@ -937,10 +949,7 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
                   </span>
                 </div>
               </div>
-              <p className="text-[11px] text-blue-200 leading-relaxed pt-1">
-                A 50% deposit confirms your driver reservation. The remaining 50% balance
-                is collected upon collection or arrival.
-              </p>
+              <p className="text-[11px] text-blue-200 leading-relaxed pt-1">A 50% deposit confirms your driver reservation. The remaining 50% balance is collected upon collection or arrival.</p>
             </div>
 
             {pricing.directCarrierTransfer && (
@@ -1010,8 +1019,8 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
             </p>
             <div className="p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs text-gray-700 space-y-1">
               <p className="font-bold text-gray-900">JB & Best Logistics LLC</p>
-              <p>2450 Piedmont Rd NE, Atlanta, GA 30324</p>
-              <p className="text-gray-500">Mon - Fri: 8:30 AM - 6:30 PM • Sat: 9:00 AM - 3:00 PM</p>
+              <p>1900 The Exchange SE, Suite 500, Atlanta, GA 30339</p>
+              <p className="text-gray-500">Pickup hours: Mon–Sat 8:00 AM–9:00 PM · Sun 12:00 PM–8:00 PM</p><p><a href="tel:+19498441280" className="text-blue-700 hover:underline">+1 949-844-1280</a> · <a href="mailto:jb.bestlogistics@gmail.com" className="text-blue-700 hover:underline">jb.bestlogistics@gmail.com</a></p>
             </div>
           </div>
         </div>

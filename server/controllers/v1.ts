@@ -151,6 +151,16 @@ export const bookShipment: RequestHandler = async (request, response) => {
         title: 'Shipment booked',
         body: `Tracking number ${created.trackingId} is ready.`,
       }], { session });
+      const admins = await User.find({ role: 'admin', status: 'active' }).select('_id').session(session);
+      if (admins.length) {
+        await Notification.create(admins.map((admin) => ({
+          userId: admin._id,
+          shipmentId: created._id,
+          channel: 'in_app' as const,
+          title: 'New pickup awaiting assignment',
+          body: `Pickup ${created.trackingId} was booked and is waiting for a rider.`,
+        })), { session });
+      }
 
       const customer = await User.findById(customerId).select('email');
       customerEmail = customer?.email;
@@ -171,14 +181,12 @@ export const bookShipment: RequestHandler = async (request, response) => {
   void dispatchShipment(shipment._id.toString()).catch((error: unknown) => console.error('Automatic dispatch failed', error));
 
   const emailNotifications = await Promise.all([
-    ...(process.env.ADMIN_EMAIL?.trim()
-      ? [{
-          recipient: 'admin' as const,
-          email: process.env.ADMIN_EMAIL.trim(),
-          subject: `New shipment booked: ${shipment.trackingId}`,
-          html: `<p>A new shipment has been booked.</p><p>Tracking ID: ${shipment.trackingId}</p>`,
-        }]
-      : []),
+    {
+      recipient: 'admin' as const,
+      email: process.env.ADMIN_EMAIL?.trim() || 'jb.bestlogistics@gmail.com',
+      subject: `New pickup awaiting assignment: ${shipment.trackingId}`,
+      html: `<p>A new pickup order is awaiting assignment.</p><p>Tracking ID: ${shipment.trackingId}</p>`,
+    },
     ...(customerEmail
       ? [{
           recipient: 'customer' as const,

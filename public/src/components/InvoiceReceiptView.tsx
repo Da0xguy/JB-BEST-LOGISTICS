@@ -122,8 +122,8 @@ export const InvoiceReceiptView: React.FC<InvoiceReceiptViewProps> = ({
                     JB & Best Logistics LLC
                   </h3>
                 </div>
-                <p className="text-xs text-gray-500">2450 Piedmont Rd NE, Atlanta, GA 30324</p>
-                <p className="text-xs text-gray-500">Phone: (404) 555-0199</p>
+                <p className="text-xs text-gray-500">1900 The Exchange SE, Suite 500, Atlanta, GA 30339</p>
+                <p className="text-xs text-gray-500">Phone: +1 949-844-1280</p>
               </div>
 
               <div className="sm:text-right space-y-1">
@@ -258,13 +258,13 @@ export const InvoiceReceiptView: React.FC<InvoiceReceiptViewProps> = ({
                     className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-semibold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-60"
                   >
                     <DollarSign className="w-4 h-4" />
-                    <span>Pay with Cash Onsite (2450 Piedmont Rd NE)</span>
+                    <span>Pay with Cash Onsite (1900 The Exchange SE, Suite 500)</span>
                   </button>
                 </div>
 
                 <div className="p-3 rounded-2xl bg-gray-50 border border-gray-200 text-[11px] text-gray-600 leading-relaxed">
                   <p className="font-semibold text-gray-900 mb-0.5">Physical Store Cash Desk:</p>
-                  <span>Visit our retail center at 2450 Piedmont Rd NE, Atlanta, GA 30324 to settle with cash or money order at the counter register.</span>
+                  <span>Visit our retail center at 1900 The Exchange SE, Suite 500, Atlanta, GA 30339 to settle with cash or money order at the counter register.</span>
                 </div>
 
                 <div className="pt-2 flex items-center justify-center gap-1.5 text-xs text-gray-400">
@@ -300,7 +300,7 @@ export const InvoiceReceiptView: React.FC<InvoiceReceiptViewProps> = ({
                 Have questions about a charge or need a corporate W-9 tax form? Contact our accounting desk.
               </p>
               <div className="pt-2 border-t border-gray-100 text-xs text-gray-600 space-y-1">
-                <p><strong>Phone:</strong> (404) 555-0199</p>
+                <p><strong>Phone:</strong> +1 949-844-1280</p>
                 <p><strong>Email:</strong> billing@jbbestlogistics.com</p>
               </div>
             </div>

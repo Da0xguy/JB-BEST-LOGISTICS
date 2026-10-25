@@ -411,7 +411,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="w-full py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-semibold flex items-center justify-center gap-2"
             >
               <Phone className="w-3.5 h-3.5" />
-              <span>Customer Care: (404) 555-0199</span>
+              <span>Customer Care: +1 949-844-1280</span>
             </a>
           </div>
         </div>

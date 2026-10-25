@@ -495,7 +495,12 @@ app.post('/api/shipments/:id/assign-rider', requireAuth, allowRoles('admin', 'wa
   if (!rider) return res.status(400).json({ error: 'Active rider not found' });
   const shipment = await Shipment.findByIdAndUpdate(req.params.id, { assignedRiderId: rider._id, status: 'assigned' }, { new: true });
   if (!shipment) return res.status(404).json({ error: 'Shipment not found' });
-  const job = await PickupJob.create({ shipmentId: shipment._id, riderId: rider._id, scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(), status: 'assigned' });
+  const pickupJob = await PickupJob.findOneAndUpdate(
+    { shipmentId: shipment._id, status: 'queued' },
+    { $set: { riderId: rider._id, scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(), status: 'assigned' } },
+    { new: true },
+  );
+  const job = pickupJob || await PickupJob.create({ shipmentId: shipment._id, riderId: rider._id, scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(), status: 'assigned' });
   await logActivity(req, 'assign', 'pickup_job', job.id, { shipmentId: shipment.id, riderId });
   return res.json({ shipment, job });
 }));
@@ -519,7 +524,7 @@ app.post('/api/payments', requireAuth, allowRoles('customer', 'warehouse', 'ware
 
 app.get('/api/jobs', requireAuth, allowRoles('rider', 'warehouse', 'warehouse_staff', 'admin'), asyncRoute(async (req: AuthRequest, res) => {
   const filter = req.user!.role === 'rider' ? { riderId: req.user!._id } : {};
-  return res.json({ jobs: await PickupJob.find(filter).populate('shipmentId').sort({ scheduledAt: 1 }).limit(100) });
+  return res.json({ jobs: await PickupJob.find(filter).populate({ path: 'shipmentId', populate: { path: 'assignedRiderId', select: 'name email phone' } }).sort({ scheduledAt: 1 }).limit(100) });
 }));
 
 app.get('/api/notifications', requireAuth, asyncRoute(async (req: AuthRequest, res) => {

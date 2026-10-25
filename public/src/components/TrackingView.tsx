@@ -629,7 +629,7 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
                       href="tel:+14045550199"
                       className="text-white text-sm font-bold hover:text-blue-300"
                     >
-                      (404) 555-0199
+                      +1 949-844-1280
                     </a>
                   </div>
                   <a

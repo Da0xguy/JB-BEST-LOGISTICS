@@ -39,11 +39,11 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
     },
     {
       q: "What is the daily cutoff time for packages to ship out today?",
-      a: "Local courier pickup times are scheduled Monday through Friday. Choose an available time when you book.",
+      a: "Pickup hours are Monday through Saturday, 8:00 AM to 9:00 PM, and Sunday, 12:00 PM to 8:00 PM.",
     },
     {
       q: "Can I use your mailbox service as my official business address?",
-      a: "Absolutely. Unlike a P.O. Box, our private mailboxes provide a real Georgia physical street address (2450 Piedmont Rd NE, Suite #___) approved for Georgia LLC filings, banking, and commercial licensing.",
+      a: "Absolutely. Our private mailboxes use our business address at 1900 The Exchange SE, Suite 500, Atlanta, GA 30339.",
     },
     {
       q: "Do I need an appointment for the Notary Public?",
@@ -69,7 +69,7 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
           </div>
           <div className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 shrink-0">
             <Clock className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Local courier service</span>
+            <span>Pickup Mon–Sat 8:00 AM–9:00 PM · Sun 12:00 PM–8:00 PM</span>
           </div>
         </div>
         <div className="bg-emerald-50/60 rounded-2xl border-2 border-emerald-200 p-5 space-y-3 max-w-xl">
@@ -77,7 +77,7 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
             JB & Best Courier
           </span>
           <p className="text-sm text-gray-700 leading-relaxed">
-            Door-to-door pickup and delivery by our local courier team. Availability and pricing are confirmed when you schedule.
+            Door-to-door pickup and delivery by our local courier team. Pickup hours are Monday–Saturday, 8:00 AM–9:00 PM, and Sunday, 12:00 PM–8:00 PM. Pickup service is $0 for now.
           </p>
           <button
             onClick={onSchedulePickup}
@@ -118,10 +118,7 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
             <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
               Personal / Small
             </span>
-            <div className="text-3xl font-bold text-gray-900">
-              $25{" "}
-              <span className="text-sm font-normal text-gray-500">/ month</span>
-            </div>
+            <div className="text-3xl font-bold text-gray-900">$0 <span className="text-sm font-normal text-gray-500">for now</span></div>
             <p className="text-xs text-gray-600 leading-relaxed">
               Great for personal letters, bank statements, and small package
               deliveries.
@@ -150,10 +147,7 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
             <span className="text-xs font-bold uppercase tracking-wider text-blue-800">
               Business / Medium
             </span>
-            <div className="text-3xl font-bold text-gray-900">
-              $45{" "}
-              <span className="text-sm font-normal text-gray-500">/ month</span>
-            </div>
+            <div className="text-3xl font-bold text-gray-900">$0 <span className="text-sm font-normal text-gray-500">for now</span></div>
             <p className="text-xs text-gray-600 leading-relaxed">
               Designed for Georgia LLCs, remote businesses, and regular package
               deliveries.
@@ -179,10 +173,7 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
             <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
               Corporate / Large
             </span>
-            <div className="text-3xl font-bold text-gray-900">
-              $75{" "}
-              <span className="text-sm font-normal text-gray-500">/ month</span>
-            </div>
+            <div className="text-3xl font-bold text-gray-900">$0 <span className="text-sm font-normal text-gray-500">for now</span></div>
             <p className="text-xs text-gray-600 leading-relaxed">
               Ideal for multi-person teams, frequent large boxes, and
               high-volume mail intake.

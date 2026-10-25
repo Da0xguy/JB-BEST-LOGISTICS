@@ -81,6 +81,31 @@ export interface WarehouseShipmentHistory {
   assignedRiderId?: { name: string; email: string; phone?: string } | string | null;
 }
 
+export interface AdminPickupJob {
+  _id: string;
+  status: 'queued' | 'assigned' | 'in_route' | 'completed' | 'failed';
+  scheduledAt: string;
+  shipmentId: {
+    _id: string;
+    trackingId: string;
+    sender: Record<string, any>;
+    receiver: Record<string, any>;
+    package: { quantity?: number; weight?: number };
+    status: string;
+    assignedRiderId?: { name?: string; email?: string; phone?: string } | string | null;
+    appointmentWindow?: { start: string; end: string; slot?: string };
+  } | null;
+}
+
+export interface AdminNotification {
+  _id: string;
+  title: string;
+  body: string;
+  shipmentId?: string;
+  readAt?: string;
+  createdAt: string;
+}
+
 interface StoredShipment {
   _id: string;
   trackingId: string;
@@ -467,6 +492,18 @@ export const updateRiderLocation = (coordinates: [number, number]) =>
 
 export const listRiderOffers = () =>
   apiRequest<{ offers: RiderDispatchOffer[] }>('/api/v1/riders/offers');
+
+export const listAdminPickupJobs = () =>
+  apiRequest<{ jobs: AdminPickupJob[] }>('/api/jobs');
+
+export const assignShipmentRider = (shipmentId: string, riderId: string, scheduledAt: string) =>
+  apiRequest<{ shipment: unknown; job: unknown }>(`/api/shipments/${shipmentId}/assign-rider`, {
+    method: 'POST',
+    body: JSON.stringify({ riderId, scheduledAt }),
+  });
+
+export const listAdminNotifications = () =>
+  apiRequest<{ notifications: AdminNotification[] }>('/api/notifications');
 
 export const acceptRiderOffer = (offerId: string) =>
   apiRequest<{ shipment: unknown }>('/api/v1/riders/accept-job', {

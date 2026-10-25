@@ -990,32 +990,26 @@ export default function App() {
               <h4 className="font-semibold text-gray-900">Store Hours</h4>
               <div className="space-y-1.5 text-gray-500 text-xs sm:text-sm">
                 <div className="flex justify-between">
-                  <span>Monday – Friday:</span>
+                  <span>Monday – Saturday:</span>
                   <span className="font-medium text-gray-800">
-                    8:00 AM – 7:00 PM
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Saturday:</span>
-                  <span className="font-medium text-gray-800">
-                    9:00 AM – 4:00 PM
+                    8:00 AM – 9:00 PM
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Sunday:</span>
-                  <span className="text-gray-400">Closed (24/7 Mailbox)</span>
+                  <span className="font-medium text-gray-800">
+                    12:00 PM – 8:00 PM
+                  </span>
                 </div>
-                <p className="text-blue-700 font-medium text-xs pt-1.5">
-                  Daily Carrier Cutoff: 5:30 PM EST
-                </p>
               </div>
             </div>
             {/* Column 4: Store Location */}
             <div className="space-y-2.5 text-sm">
               <h4 className="font-semibold text-gray-900">Visit or call</h4>
               <div className="space-y-1 pt-1 text-xs text-gray-500">
-                <p>📍 2450 Piedmont Rd NE, Atlanta GA</p>
-                <p>📞 (404) 555-0199</p>
+                <p>📍 1900 The Exchange SE, Suite 500, Atlanta, GA 30339</p>
+                <p>📞 <a href="tel:+19498441280" className="hover:text-blue-600">+1 949-844-1280</a></p>
+                <p>✉️ <a href="mailto:jb.bestlogistics@gmail.com" className="hover:text-blue-600">jb.bestlogistics@gmail.com</a></p>
               </div>
             </div>
           </div>

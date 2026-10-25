@@ -28,8 +28,9 @@ import {
   Activity,
   Send,
   Zap,
-  Banknote,
+
   Navigation,
+  Bell,
 } from "lucide-react";
 import { DashboardSidebar } from "../DashboardSidebar";
 import {
@@ -46,6 +47,11 @@ import {
   ProvisionableRole,
   updateAdminUserStatus,
   deleteStaffAccount,
+  listAdminNotifications,
+  listAdminPickupJobs,
+  assignShipmentRider,
+  AdminNotification,
+  AdminPickupJob,
 } from "../../lib/api";
 import { AdminShipmentAssignmentsView } from "./AdminShipmentAssignmentsView";
 import {
@@ -175,6 +181,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   >("kpis");
 
   const [localPickups, setLocalPickups] = useState<PickupRequest[]>(pickups);
+  const [serverPickupJobs, setServerPickupJobs] = useState<AdminPickupJob[]>([]);
+  const [adminNotifications, setAdminNotifications] = useState<AdminNotification[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [dispatchLoadError, setDispatchLoadError] = useState("");
   const [staffActivities, setStaffActivities] = useState<StaffActivity[]>(
     DEFAULT_ACTIVITIES
   );
@@ -219,8 +229,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setLocalPickups(pickups);
   }, [pickups]);
 
+  const refreshServerPickups = async () => {
+    try {
+      const [{ jobs }, { notifications }] = await Promise.all([
+        listAdminPickupJobs(),
+        listAdminNotifications(),
+      ]);
+      setServerPickupJobs(jobs.filter((job) => job.shipmentId));
+      setAdminNotifications(notifications);
+      setDispatchLoadError("");
+    } catch (error) {
+      setDispatchLoadError(error instanceof Error ? error.message : "Unable to load saved pickup orders");
+    }
+  };
+
   useEffect(() => {
-    if (activeAdminTab !== "staff") return;
+    void refreshServerPickups();
+    const timer = window.setInterval(() => void refreshServerPickups(), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const pendingServerPickups = serverPickupJobs.filter((job) =>
+    job.status === "queued" && job.shipmentId && !job.shipmentId.assignedRiderId
+  );
+
+  useEffect(() => {
+    if (activeAdminTab !== "staff" && activeAdminTab !== "dispatch") return;
     let isCurrent = true;
     setIsLoadingUsers(true);
     setUsersError("");
@@ -243,6 +277,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       isCurrent = false;
     };
   }, [activeAdminTab]);
+
+  const assignQueuedServerPickup = async (job: AdminPickupJob) => {
+    const shipment = job.shipmentId;
+    const rider = activeRiders[0];
+    if (!shipment || !rider) {
+      setDispatchNotice("Add or activate a rider account before assigning this pickup.");
+      return;
+    }
+    try {
+      await assignShipmentRider(shipment._id, rider.id, job.scheduledAt);
+      setDispatchNotice(`Assigned ${shipment.trackingId} to ${rider.name}.`);
+      await refreshServerPickups();
+    } catch (error) {
+      setDispatchNotice(error instanceof Error ? error.message : "Unable to assign pickup.");
+    }
+  };
 
   const activeRiders: RiderCandidate[] = adminUsers.filter(
     (u) => u.role === "rider" && u.status === "active"
@@ -286,40 +336,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
     setDispatchNotice(
       `✓ Successfully auto-assigned ${result.assignedCount} pending pickup(s) across active riders!`
-    );
-  };
-
-  // Mark Cash Paid at Register
-  const handleMarkCashCollected = (pickup: PickupRequest) => {
-    const updatedPickup: PickupRequest = {
-      ...pickup,
-      paidAtRegister: true,
-      depositPaid: true,
-      updatedAt: new Date().toISOString(),
-    };
-    const updatedList = localPickups.map((p) =>
-      p.id === pickup.id ? updatedPickup : p
-    );
-    setLocalPickups(updatedList);
-    onUpdatePickups?.(updatedList);
-    onUpdatePickup?.(updatedPickup);
-
-    const depositVal = pickup.depositAmount || 20;
-    const activity: StaffActivity = {
-      id: `act-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      staffId: "usr-a1",
-      staffName: "Store Front Register",
-      staffRole: "admin",
-      action: "cash_collected",
-      details: `Collected $${depositVal.toFixed(2)} cash deposit for order ${
-        pickup.trackingNumber || pickup.id
-      } at 2450 Piedmont Rd NE counter register.`,
-      targetTrackingId: pickup.trackingNumber || pickup.id,
-      timestamp: new Date().toISOString(),
-    };
-    setStaffActivities((prev) => [activity, ...prev]);
-    setDispatchNotice(
-      `✓ Marked $${depositVal.toFixed(2)} cash deposit received at store register.`
     );
   };
 
@@ -519,6 +535,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         ]}
       />
       <div className="min-w-0 flex-1 space-y-8 p-4 sm:p-6 lg:p-8">
+      <div className="flex justify-end">
+        <div className="relative">
+          <button type="button" onClick={() => setShowNotifications((visible) => !visible)} aria-label={`${adminNotifications.length} admin notifications`} className="relative rounded-xl border border-gray-200 bg-white p-2.5 text-gray-700 shadow-xs hover:bg-gray-50">
+            <Bell className="h-5 w-5" />
+            {adminNotifications.length > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">{adminNotifications.length}</span>}
+          </button>
+          {showNotifications && <div className="absolute right-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-gray-200 bg-white p-3 shadow-xl">
+            <div className="mb-2 flex items-center justify-between"><h3 className="font-bold text-gray-900">Order notifications</h3><button type="button" onClick={() => setShowNotifications(false)} className="text-xs text-blue-700">Close</button></div>
+            {adminNotifications.length ? <ul className="max-h-80 space-y-2 overflow-y-auto">{adminNotifications.map((notification) => <li key={notification._id} className="rounded-xl bg-blue-50 p-3"><p className="text-sm font-semibold text-gray-900">{notification.title}</p><p className="mt-1 text-xs text-gray-600">{notification.body}</p><p className="mt-1 text-[10px] text-gray-400">{new Date(notification.createdAt).toLocaleString()}</p></li>)}</ul> : <p className="py-4 text-sm text-gray-500">No notifications yet.</p>}
+          </div>}
+        </div>
+      </div>
+      {dispatchLoadError && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{dispatchLoadError}</p>}
+      {pendingServerPickups.length > 0 && <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><h2 className="font-bold text-amber-950">Awaiting rider assignment ({pendingServerPickups.length})</h2><ul className="mt-2 space-y-2">{pendingServerPickups.map((job) => <li key={job._id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3 text-sm"><span><strong className="font-mono">{job.shipmentId!.trackingId}</strong> · {job.shipmentId!.sender?.name || "Customer"} · {job.shipmentId!.receiver?.city || "Delivery"}</span><span className="text-xs text-gray-500">{job.scheduledAt ? new Date(job.scheduledAt).toLocaleString() : "Scheduled"}</span><button type="button" onClick={() => void assignQueuedServerPickup(job)} disabled={!activeRiders.length} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Assign to {activeRiders[0]?.name || "available rider"}</button></li>)}</ul><button type="button" onClick={() => void refreshServerPickups()} className="mt-3 text-xs font-semibold text-blue-700">Refresh pickup orders</button></section>}
       {/* Top Executive KPI Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-3xl border border-gray-200/80 p-5 shadow-xs space-y-2">
@@ -671,8 +701,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {filteredPickups.length > 0 ? (
               filteredPickups.map((p) => {
                 const isAssigned = Boolean(p.assignedDriverId);
-                const isCash = p.paymentMethod === "cash_onsite";
-                const isCashPaid = Boolean(p.paidAtRegister);
 
                 return (
                   <div
@@ -796,38 +824,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                     {/* Action Bar: Cash Settlement & Rider Assignment */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-gray-100">
-                      {/* Cash onsite status */}
-                      <div className="flex items-center gap-2">
-                        {isCash ? (
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${
-                                isCashPaid
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : "bg-amber-100 text-amber-800"
-                              }`}
-                            >
-                              <Banknote className="w-3.5 h-3.5" />
-                              {isCashPaid
-                                ? "Cash Settled at Register"
-                                : "Cash Payment Due Onsite (2450 Piedmont Rd NE)"}
-                            </span>
-                            {!isCashPaid && (
-                              <button
-                                type="button"
-                                onClick={() => handleMarkCashCollected(p)}
-                                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition cursor-pointer"
-                              >
-                                Mark Cash Paid (${(p.depositAmount ?? 17.5).toFixed(2)})
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-bold flex items-center gap-1.5">
-                            <CreditCard className="w-3.5 h-3.5" /> 50% Deposit Paid Online
-                          </span>
-                        )}
-                      </div>
+                      <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-bold"><CreditCard className="mr-1 inline h-3.5 w-3.5" />Pickup payment status: {p.paymentMethod === "cash_onsite" ? "Cash onsite" : "Online deposit"}</span>
+
+
 
                       {/* Rider assignment */}
                       <div className="flex items-center gap-2">
