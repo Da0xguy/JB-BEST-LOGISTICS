@@ -205,7 +205,7 @@ export const provisionAdminUser = (account: {
   vehicleType?: 'bike' | 'van' | 'truck';
   weightCapacityKg?: number;
 }) =>
-  apiRequest<{ user: AdminUser; temporaryPassword?: string }>('/api/v1/admin/users', {
+  apiRequest<{ user: AdminUser; temporaryPassword?: string; temporaryPasswordEmailSent?: boolean }>('/api/v1/admin/users', {
     method: 'POST',
     body: JSON.stringify(account),
   });

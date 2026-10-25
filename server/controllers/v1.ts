@@ -43,6 +43,10 @@ const isGeoPoint = (value: unknown): value is GeoPoint => {
     && coordinates[1] >= -90 && coordinates[1] <= 90;
 };
 
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+} as Record<string, string>)[character]);
+
 const createTrackingNumber = async () => {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   for (;;) {
@@ -583,9 +587,23 @@ export const provisionStaffAccount: RequestHandler = async (request, response) =
     await session.endSession();
   }
   if (!createdUser) throw new ApiError(500, 'Account provisioning did not complete');
+  let temporaryPasswordEmailSent = false;
+  if (generatedPassword) {
+    try {
+      await sendMail(
+        createdUser.email,
+        'Your JB & Best Logistics account is ready',
+        `<p>Hello ${escapeHtml(createdUser.name)},</p><p>Your ${escapeHtml(String(role))} account has been created.</p><p><strong>Email:</strong> ${escapeHtml(createdUser.email)}<br><strong>Temporary password:</strong> ${escapeHtml(generatedPassword)}</p><p>For your security, you must choose a new password when you first sign in.</p>`,
+      );
+      temporaryPasswordEmailSent = true;
+    } catch (error) {
+      console.error('Failed to email temporary account password:', error instanceof Error ? error.message : 'Unknown email delivery error');
+    }
+  }
   return response.status(201).json({
     user: publicUser(createdUser),
     ...(generatedPassword ? { temporaryPassword: generatedPassword } : {}),
+    ...(generatedPassword ? { temporaryPasswordEmailSent } : {}),
   });
 };
 

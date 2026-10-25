@@ -212,6 +212,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [createdTemporaryPassword, setCreatedTemporaryPassword] = useState<
     string | null
   >(null);
+  const [temporaryPasswordEmailSent, setTemporaryPasswordEmailSent] = useState(false);
+  const [temporaryPasswordEmail, setTemporaryPasswordEmail] = useState("");
 
   useEffect(() => {
     setLocalPickups(pickups);
@@ -325,6 +327,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     event.preventDefault();
     setCreateUserError("");
     setCreatedTemporaryPassword(null);
+    setTemporaryPasswordEmailSent(false);
     setIsCreatingUser(true);
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
@@ -351,6 +354,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       });
       setAdminUsers((current) => [result.user, ...current]);
       setCreatedTemporaryPassword(result.temporaryPassword || null);
+      setTemporaryPasswordEmailSent(result.temporaryPasswordEmailSent === true);
+      setTemporaryPasswordEmail(email);
       setShowCreateUserModal(false);
 
       const activity: StaffActivity = {
@@ -365,31 +370,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setStaffActivities((prev) => [activity, ...prev]);
       formElement.reset();
     } catch (error) {
-      // Local fallback in case server endpoint is unavailable
-      const fallbackUser: AdminUser = {
-        id: `usr-${Date.now().toString().slice(-4)}`,
-        name,
-        email,
-        phone,
-        role,
-        status: "active",
-        mustChangePassword: true,
-      };
-      setAdminUsers((current) => [fallbackUser, ...current]);
-      setCreatedTemporaryPassword("TempPass2026!#" + Math.floor(100 + Math.random() * 900));
-      setShowCreateUserModal(false);
-
-      const activity: StaffActivity = {
-        id: `act-${Date.now()}`,
-        staffId: "usr-a1",
-        staffName: "Administrator Desk",
-        staffRole: "admin",
-        action: "account_created",
-        details: `Provisioned new ${role.toUpperCase()} account for ${name} (${email}).`,
-        timestamp: new Date().toISOString(),
-      };
-      setStaffActivities((prev) => [activity, ...prev]);
-      formElement.reset();
+      setCreateUserError(error instanceof Error ? error.message : "Could not create the account. Please try again.");
     } finally {
       setIsCreatingUser(false);
     }
@@ -1257,7 +1238,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {createdTemporaryPassword && (
             <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-              <p className="font-semibold">Temporary password, shown once</p>
+              <p className="font-semibold">
+                {temporaryPasswordEmailSent
+                  ? `Temporary password emailed to ${temporaryPasswordEmail}`
+                  : `Email could not be sent to ${temporaryPasswordEmail}. Share this password securely.`}
+              </p>
               <p className="mt-1 font-mono select-all">
                 {createdTemporaryPassword}
               </p>
