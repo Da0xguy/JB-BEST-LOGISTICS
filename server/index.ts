@@ -20,8 +20,17 @@ import { EmailDeliveryError, isEmailConfigured, sendMail } from './lib/email';
 
 const app = express();
 app.set('trust proxy', 1);
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || config.clientOrigins.includes(origin)) return callback(null, true);
+    return callback(null, false);
+  },
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(helmet());
-app.use(cors({ origin: config.clientOrigins, credentials: true }));
 app.use(express.json({ limit: '2mb' }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/v1', v1Router);
