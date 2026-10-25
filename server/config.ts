@@ -1,8 +1,12 @@
 import 'dotenv/config';
 
-const productionClientOrigin = 'https://jb-best-logistics.vercel.app';
+const productionClientOrigins = [
+  'https://jb-best-logistics.vercel.app',
+  'https://www.jb-bestlogistics.com',
+  'https://jb-bestlogistics.com',
+];
 const defaultClientOrigin = process.env.NODE_ENV === 'production'
-  ? productionClientOrigin
+  ? productionClientOrigins[0]
   : 'http://localhost:3000';
 const configuredClientOrigins = (process.env.CLIENT_ORIGIN || defaultClientOrigin)
   .split(',')
@@ -31,7 +35,7 @@ export const config = {
   clientOrigin: configuredClientOrigins[0] || defaultClientOrigin,
   clientOrigins: [...new Set([
     ...configuredClientOrigins,
-    productionClientOrigin,
+    ...productionClientOrigins,
     ...localClientOrigins,
   ])],
   paystackSecret: process.env.PAYSTACK_SECRET_KEY || '',
