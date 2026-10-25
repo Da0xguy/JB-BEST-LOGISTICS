@@ -171,8 +171,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Light, Minimal Utility Strip & Portal Switcher */}
 
       {/* Main Clean Header */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-6">
+      <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between gap-2 sm:gap-6">
           {/* Decluttered Brand Logo */}
           <div
             onClick={() => handleNavClick("services")}
@@ -186,14 +186,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="font-display font-bold text-lg text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">
                 JB & Best
               </span>
-              <span className="font-display font-medium text-sm text-slate-500">
+              <span className="hidden font-display text-sm font-medium text-slate-500 sm:inline">
                 Logistics
               </span>
             </div>
 
             {portal !== "consumer" && (
               <span
-                className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                className={`ml-2 hidden px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider sm:inline-flex ${
                   portal === "staff"
                     ? "bg-amber-100 text-amber-900 border border-amber-200"
                     : "bg-slate-900 text-white border border-slate-700"
@@ -282,7 +282,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {portal === "consumer" ? (
               <>
                 <a
-                  href="tel:+14045550199"
+                  href="tel:+19498441280"
                   className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 cursor-pointer"
                 >
                   <Phone className="h-3.5 w-3.5" />
@@ -399,20 +399,32 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
 
           <div className="pt-3 border-t border-slate-100 space-y-2 text-center text-xs text-slate-500">
-            <button
-              onClick={handleAccountClick}
-              className="w-full py-2 px-3 bg-slate-900 hover:bg-blue-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <User className="w-3.5 h-3.5" />
-              <span className="max-w-full truncate">{isCustomerAuthenticated ? accountLabel : "Log in or sign up"}</span>
-            </button>
-            <a
-              href="tel:+14045550199"
-              className="w-full py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-semibold flex items-center justify-center gap-2"
-            >
-              <Phone className="w-3.5 h-3.5" />
-              <span>Customer Care: +1 949-844-1280</span>
-            </a>
+            {portal === "consumer" ? (
+              <>
+                <button
+                  onClick={handleAccountClick}
+                  className="w-full py-2.5 px-3 bg-slate-900 hover:bg-blue-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <User className="w-3.5 h-3.5" />
+                  <span className="max-w-full truncate">{isCustomerAuthenticated ? accountLabel : "Log in or sign up"}</span>
+                </button>
+                <a
+                  href="tel:+19498441280"
+                  className="w-full py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-semibold flex items-center justify-center gap-2"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                  <span>Customer Care: +1 949-844-1280</span>
+                </a>
+              </>
+            ) : (
+              <button
+                onClick={() => handleSwitchPortal("consumer")}
+                className="w-full py-2.5 px-3 bg-slate-900 hover:bg-blue-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Store className="w-3.5 h-3.5" />
+                <span>Exit to Storefront</span>
+              </button>
+            )}
           </div>
         </div>
       )}

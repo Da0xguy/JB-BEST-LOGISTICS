@@ -209,7 +209,7 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
     "mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-blue-600 focus:outline-none";
 
   return (
-    <section className="mx-auto max-w-3xl space-y-5">
+    <section className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6 sm:px-0 sm:py-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-blue-700">

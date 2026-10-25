@@ -520,7 +520,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   return (
-    <div className="flex min-h-[calc(100svh-4rem)] items-stretch gap-0 animate-in fade-in duration-200">
+    <div className="flex min-h-[calc(100svh-4rem)] flex-col items-stretch gap-0 animate-in fade-in duration-200 md:flex-row">
       <DashboardSidebar
         title="Admin Console"
         activeItem={activeAdminTab}
@@ -534,7 +534,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           { id: "invoices", label: "Billing & Invoices", icon: Receipt },
         ]}
       />
-      <div className="min-w-0 flex-1 space-y-8 p-4 sm:p-6 lg:p-8">
+      <div className="min-w-0 flex-1 space-y-6 p-3 sm:space-y-8 sm:p-6 lg:p-8">
       <div className="flex justify-end">
         <div className="relative">
           <button type="button" onClick={() => setShowNotifications((visible) => !visible)} aria-label={`${adminNotifications.length} admin notifications`} className="relative rounded-xl border border-gray-200 bg-white p-2.5 text-gray-700 shadow-xs hover:bg-gray-50">

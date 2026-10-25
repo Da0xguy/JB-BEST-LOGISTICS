@@ -328,7 +328,7 @@ export const RiderDashboard: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6 px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-blue-700">

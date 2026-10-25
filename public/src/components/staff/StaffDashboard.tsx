@@ -320,7 +320,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   };
 
   return (
-    <div className="flex min-h-[calc(100svh-4rem)] items-stretch gap-0 animate-in fade-in duration-200">
+    <div className="flex min-h-[calc(100svh-4rem)] flex-col items-stretch gap-0 animate-in fade-in duration-200 md:flex-row">
       <DashboardSidebar
         title="Staff Workspace"
         activeItem={activeStaffTab}
@@ -335,7 +335,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
           { id: "history", label: "History", icon: History },
         ]}
       />
-      <div className="min-w-0 flex-1 space-y-8 p-4 sm:p-6 lg:p-8">
+      <div className="min-w-0 flex-1 space-y-6 p-3 sm:space-y-8 sm:p-6 lg:p-8">
       <header>
         <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
           Warehouse workspace

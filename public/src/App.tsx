@@ -66,7 +66,7 @@ function ToastHost({
   onClose: (id: number) => void;
 }) {
   return (
-    <div className="fixed top-5 right-5 z-[100] flex w-[min(92vw,380px)] flex-col gap-3">
+    <div className="fixed inset-x-3 top-3 z-[100] flex flex-col gap-3 sm:left-auto sm:right-5 sm:top-5 sm:w-[min(92vw,380px)]">
       {toasts.map((toast) => {
         const isProcessing = toast.variant === "processing";
         const isSuccess = toast.variant === "success";
@@ -593,15 +593,15 @@ export default function App() {
           />
         ) : portalAccess === "allowed" ? (
           <>
-            <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-8">
-              <div className="flex items-center gap-3">
+            <header className="flex h-16 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 sm:gap-4 sm:px-8">
+              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                 <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white">
                   <Package className="h-5 w-5" />
                 </span>
-                <span className="font-display font-bold text-slate-900">
+                <span className="truncate font-display text-sm font-bold text-slate-900 sm:text-base">
                   JB & Best Logistics
                 </span>
-                <span className="border-l border-slate-200 pl-3 text-sm font-semibold capitalize text-slate-500">
+                <span className="hidden border-l border-slate-200 pl-3 text-sm font-semibold capitalize text-slate-500 sm:inline">
                   {portalMode === "staff" ? "warehouse" : portalMode} portal
                 </span>
               </div>
@@ -612,7 +612,7 @@ export default function App() {
                   setUserRole("customer");
                   routeTo(`/${portalMode}/login`);
                 }}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 sm:text-sm"
               >
                 Sign out
               </button>
@@ -765,7 +765,7 @@ export default function App() {
                   <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/60 to-slate-950/20" />
 
                   <div className="relative z-10 flex min-h-[calc(100svh-4rem)] max-w-4xl flex-col justify-center space-y-5 p-6 sm:min-h-[620px] sm:p-10 lg:min-h-[calc(100svh-4rem)] lg:p-14 animate-fade-up">
-                    <h1 className="max-w-4xl text-4xl font-display font-bold text-white tracking-tight leading-[1.05] sm:text-5xl lg:text-6xl">
+                    <h1 className="max-w-4xl text-3xl font-display font-bold text-white tracking-tight leading-[1.05] sm:text-5xl lg:text-6xl">
                       Shipping, Packing & Notary{" "}
                       <span className="text-cyan-600">Made Simple</span>.
                     </h1>
