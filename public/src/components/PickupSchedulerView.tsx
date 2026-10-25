@@ -17,7 +17,6 @@ import {
   CreditCard,
   DollarSign,
   AlertTriangle,
-  Send,
   Info,
   Banknote,
 } from "lucide-react";
@@ -64,7 +63,7 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
   const [deliveryCountry, setDeliveryCountry] = useState("USA");
 
   // Step 3: Carrier & Service
-  const [preferredCarrier, setPreferredCarrier] = useState<Carrier>("ups");
+  const preferredCarrier: Carrier = "jb_freight";
 
   // Step 4: Schedule, Dimensions, Weight & Mileage
   const [pickupDate, setPickupDate] = useState("2026-09-08");
@@ -166,6 +165,15 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
         "Missing delivery destination",
         "Please specify the recipient delivery address, city, and postal code.",
         "error"
+      );
+      return;
+    }
+
+    if (classifyDestination(state, 'USA') !== 'local' || destinationClassification !== 'local') {
+      onNotify?.(
+        'Local courier service only',
+        'JB & Best currently accepts courier pickups and deliveries within Georgia, USA.',
+        'error'
       );
       return;
     }
@@ -325,15 +333,14 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
       <div className="bg-white rounded-3xl border border-gray-200/80 p-6 sm:p-8 shadow-xs">
         <div className="max-w-3xl space-y-2">
           <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200/60 inline-flex items-center gap-1.5">
-            <Truck className="w-3.5 h-3.5" /> Doorstep Collection & Carrier Tender
+            <Truck className="w-3.5 h-3.5" /> Local Courier Service
           </span>
           <h2 className="text-2xl sm:text-3xl font-display font-bold text-gray-900">
             Schedule a Package Pickup & Delivery
           </h2>
           <p className="text-sm text-gray-500 leading-relaxed">
-            A rider picks up directly from your doorstep. In-state orders are delivered
-            locally; out-of-state & international parcels are tendered directly to the
-            carrier hub (DHL, FedEx, UPS, USPS).
+            Schedule a doorstep pickup and local delivery with a JB & Best courier.
+            Service is currently available for local Georgia destinations.
           </p>
         </div>
       </div>
@@ -589,57 +596,31 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
               </div>
             </div>
 
-            {/* Direct Carrier Routing Alert for Out of State / International */}
-            {destinationClassification !== "local" ? (
-              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200/80 text-xs text-amber-900 space-y-1">
-                <div className="flex items-center gap-2 font-bold">
-                  <Send className="w-4 h-4 text-amber-600" />
-                  <span>Direct Carrier Tender Activated</span>
-                </div>
-                <p className="text-amber-800 leading-relaxed">
-                  Destination is <strong>{destinationClassification === "international" ? "International" : "Out of State"}</strong> ({deliveryState}, {deliveryCountry}).
-                  Our driver will pick up from your doorstep and tender this parcel directly to the <strong>{pricing.carrierHubName}</strong> for high-speed long-haul linehaul.
-                </p>
-              </div>
-            ) : (
+            {destinationClassification === "local" ? (
               <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Local Georgia direct courier delivery via JB & Best dispatch fleet.</span>
+                <span>Local delivery by a JB & Best courier.</span>
+              </div>
+            ) : (
+              <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center gap-2">
+                <Info className="w-4 h-4 shrink-0" />
+                <span>Local courier service is currently available for Georgia destinations only.</span>
               </div>
             )}
           </div>
 
-          {/* STEP 3: Carrier Selection */}
+          {/* STEP 3: Local Courier Service */}
           <div className="space-y-3 pt-3 border-t border-gray-100">
             <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
               <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs flex items-center justify-center font-bold">
                 3
               </span>
-              <span>Carrier Linehaul Tender</span>
+              <span>Delivery Service</span>
             </h3>
 
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-              {[
-                { id: "ups", label: "UPS", desc: "Air & Ground" },
-                { id: "fedex", label: "FedEx", desc: "Express Hub" },
-                { id: "dhl", label: "DHL", desc: "Worldwide Air" },
-                { id: "usps", label: "USPS", desc: "Postal Hub" },
-                { id: "jb_freight", label: "JB Van", desc: "Local Courier" },
-              ].map((c) => (
-                <button
-                  type="button"
-                  key={c.id}
-                  onClick={() => setPreferredCarrier(c.id as Carrier)}
-                  className={`p-3 rounded-2xl border text-center transition-all cursor-pointer ${
-                    preferredCarrier === c.id
-                      ? "border-blue-600 bg-blue-50/70 shadow-xs ring-2 ring-blue-100"
-                      : "border-gray-200 hover:border-gray-300 bg-white"
-                  }`}
-                >
-                  <p className="text-xs font-bold text-gray-900 uppercase">{c.label}</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">{c.desc}</p>
-                </button>
-              ))}
+            <div className="rounded-2xl border-2 border-blue-600 bg-blue-50/70 p-4">
+              <p className="text-sm font-bold text-gray-900">JB & Best Local Courier</p>
+              <p className="text-xs text-gray-600 mt-1">Doorstep pickup and delivery within Georgia.</p>
             </div>
           </div>
 

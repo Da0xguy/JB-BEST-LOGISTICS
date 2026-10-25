@@ -121,7 +121,7 @@ const DEFAULT_ACTIVITIES: StaffActivity[] = [
     staffRole: "rider",
     action: "pickup_assigned",
     details:
-      "Auto-assigned pickup PKP-9821 for doorstep collection at Lenox Rd NE -> Transferred directly to DHL Express Worldwide Gateway.",
+      "Auto-assigned local courier pickup PKP-9821 for doorstep collection at Lenox Rd NE.",
     targetTrackingId: "PKP-9821",
     timestamp: new Date(Date.now() - 12 * 60000).toISOString(),
   },
@@ -143,8 +143,8 @@ const DEFAULT_ACTIVITIES: StaffActivity[] = [
     staffRole: "rider",
     action: "carrier_tendered",
     details:
-      "Completed out-of-state linehaul tender: delivered 4 parcels directly to UPS Smart Hub Atlanta Air Gateway.",
-    targetTrackingId: "UPS-ATL-TENDER",
+      "Completed local courier deliveries for the day's dispatch route.",
+    targetTrackingId: "JB-LOCAL-DELIVERY",
     timestamp: new Date(Date.now() - 65 * 60000).toISOString(),
   },
   {
@@ -154,7 +154,7 @@ const DEFAULT_ACTIVITIES: StaffActivity[] = [
     staffRole: "warehouse",
     action: "shipment_intake",
     details:
-      "Processed customer intake and issued barcoded label for FedEx 2Day Express parcel.",
+      "Processed customer intake and issued a local courier tracking label.",
     targetTrackingId: "JB-8821-US",
     timestamp: new Date(Date.now() - 110 * 60000).toISOString(),
   },
@@ -572,7 +572,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="text-2xl sm:text-3xl font-display font-bold text-gray-900">
             {totalParcels} Parcels
           </div>
-          <p className="text-xs text-gray-500">Across FedEx, UPS, USPS & DHL</p>
+          <p className="text-xs text-gray-500">JB & Best courier deliveries</p>
         </div>
 
         <div className="bg-white rounded-3xl border border-gray-200/80 p-5 shadow-xs space-y-2">
@@ -587,10 +587,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="text-2xl sm:text-3xl font-display font-bold text-gray-900">
             {localPickups.length} Pickups
           </div>
-          <p className="text-xs text-amber-700 font-medium">
-            {localPickups.filter((p) => p.directCarrierTransfer).length} Carrier
-            Hub Tenders (DHL/FedEx/UPS)
-          </p>
+          <p className="text-xs text-amber-700 font-medium">Local courier bookings</p>
         </div>
 
         <div className="bg-white rounded-3xl border border-gray-200/80 p-5 shadow-xs space-y-2">
@@ -634,9 +631,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span>Automated Pickup Dispatch Hub</span>
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Automatically allocate pickups to available riders, tender
-                out-of-state/international orders to carrier hubs (DHL, FedEx, UPS, USPS),
-                and track 50% deposits & counter cash.
+                Automatically assign local Georgia courier pickups to available
+                riders and track deposits and counter cash.
               </p>
             </div>
 
@@ -667,11 +663,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 })`,
               },
               {
-                id: "carrier_tender",
-                label: `Carrier Hub Direct Tenders (${
-                  localPickups.filter((p) => p.directCarrierTransfer).length
-                })`,
-              },
               {
                 id: "cash_onsite",
                 label: `Onsite Cash Payments (${
@@ -1015,41 +1006,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {activeAdminTab === "kpis" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Carrier Share Breakdown */}
+            {/* Local Courier Volume */}
             <div className="lg:col-span-6 bg-white rounded-3xl border border-gray-200/80 p-6 shadow-xs space-y-4">
               <h3 className="font-bold text-base text-gray-900 flex items-center justify-between">
-                <span>Carrier Volume Distribution</span>
+                <span>Local Courier Volume</span>
                 <span className="text-xs font-normal text-gray-500">This Month</span>
               </h3>
 
               <div className="space-y-4 pt-2">
                 {[
                   {
-                    carrier: "UPS Ground & Air",
-                    share: 44,
-                    color: "bg-amber-500",
-                    count: "62 pkgs",
+                    carrier: "JB & Best Local Courier",
+                    share: 100,
+                    color: "bg-emerald-500",
+                    count: `${localPickups.length} bookings`,
                   },
                   {
-                    carrier: "FedEx Express & Home",
-                    share: 36,
+                    carrier: "",
+                    share: 0,
                     color: "bg-blue-600",
                     count: "51 pkgs",
                   },
                   {
-                    carrier: "USPS Priority & Media",
-                    share: 15,
+                    carrier: "",
+                    share: 0,
                     color: "bg-sky-500",
                     count: "21 pkgs",
                   },
                   {
-                    carrier: "DHL Express Worldwide",
-                    share: 5,
+                    carrier: "",
+                    share: 0,
                     color: "bg-red-500",
                     count: "8 pkgs",
                   },
                 ].map((item) => (
-                  <div key={item.carrier} className="space-y-1.5">
+                  <div key={item.carrier || item.color} className={`space-y-1.5 ${item.carrier ? '' : 'hidden'}`}>
                     <div className="flex items-center justify-between text-xs font-semibold text-gray-700">
                       <span>{item.carrier}</span>
                       <span className="text-gray-500">
@@ -1067,10 +1058,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
 
-            {/* Carrier SLA & Daily Cutoffs */}
+            {/* Local Courier Schedule */}
             <div className="lg:col-span-6 bg-white rounded-3xl border border-gray-200/80 p-6 shadow-xs space-y-4">
               <h3 className="font-bold text-base text-gray-900 flex items-center justify-between">
-                <span>Evening Carrier Linehaul Cutoffs</span>
+                <span>Local Courier Schedule</span>
                 <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full">
                   Mon-Fri 5:30 PM
                 </span>
@@ -1082,7 +1073,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <Clock className="w-5 h-5 text-amber-600" />
                     <div>
                       <p className="font-bold text-gray-900">
-                        UPS Evening Linehaul Vehicle
+                        Local Courier North Route
                       </p>
                       <p className="text-gray-500">
                         Cutoff: 5:30 PM • Driver ETA: 5:15 PM
@@ -1099,7 +1090,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <Clock className="w-5 h-5 text-blue-600" />
                     <div>
                       <p className="font-bold text-gray-900">
-                        FedEx Express Air Linehaul
+                        Local Courier Central Route
                       </p>
                       <p className="text-gray-500">
                         Cutoff: 5:45 PM • Driver ETA: 5:30 PM
@@ -1116,7 +1107,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <Clock className="w-5 h-5 text-red-600" />
                     <div>
                       <p className="font-bold text-gray-900">
-                        DHL Worldwide Express Gateway Shuttle
+                        Local Courier South Route
                       </p>
                       <p className="text-gray-500">
                         Cutoff: 5:00 PM • Driver ETA: 4:45 PM

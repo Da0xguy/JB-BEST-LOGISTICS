@@ -60,8 +60,8 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
 
   // Intake state
   const [newTrackingNum, setNewTrackingNum] = useState("");
-  const [carrier, setCarrier] = useState<Carrier>("fedex");
-  const [service, setService] = useState("FedEx 2Day Air");
+  const carrier: Carrier = "jb_freight";
+  const [service, setService] = useState("JB Local Courier");
   const [recipientName, setRecipientName] = useState(
     "Georgia Client Recipient",
   );
@@ -403,13 +403,9 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                   </label>
                   <select
                     value={carrier}
-                    onChange={(e) => setCarrier(e.target.value as Carrier)}
                     className="w-full p-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:outline-none"
                   >
-                    <option value="fedex">FedEx Express / Ground</option>
-                    <option value="ups">UPS Ground / Air</option>
-                    <option value="usps">USPS Priority / Express</option>
-                    <option value="jb_freight">JB Local Courier Van</option>
+                    <option value="jb_freight">JB Local Courier</option>
                   </select>
                 </div>
 
@@ -994,13 +990,9 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                       </label>
                       <select
                         value={carrier}
-                        onChange={(e) => setCarrier(e.target.value as Carrier)}
                         className="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none"
                       >
-                        <option value="fedex">FedEx</option>
-                        <option value="ups">UPS</option>
-                        <option value="usps">USPS</option>
-                        <option value="jb_freight">JB Freight</option>
+                        <option value="jb_freight">JB Local Courier</option>
                       </select>
                     </div>
                     <div>
@@ -1215,21 +1207,21 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-1">
-              <span className="font-bold text-gray-900">UPS Staging Dock</span>
+              <span className="font-bold text-gray-900">Courier Dispatch Area</span>
               <p className="text-amber-800 font-medium">
                 3 Parcels Ready • Driver Arrival: 5:15 PM
               </p>
             </div>
             <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-1">
               <span className="font-bold text-gray-900">
-                FedEx Express Air Bin
+                Local Courier Parcels
               </span>
               <p className="text-blue-800 font-medium">
                 2 Parcels Ready • Driver Arrival: 5:30 PM
               </p>
             </div>
             <div className="p-4 rounded-2xl bg-sky-50/70 border border-sky-200/80 space-y-1">
-              <span className="font-bold text-gray-900">USPS Mail Sacks</span>
+              <span className="font-bold text-gray-900">Courier Delivery Queue</span>
               <p className="text-sky-800 font-medium">
                 1 Sack Ready • Shuttle Arrival: 4:45 PM
               </p>

@@ -114,7 +114,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     },
     {
       label: "Shipping",
-      desc: "FedEx, UPS, USPS, and doorstep delivery",
+      desc: "Local courier pickup and delivery in Georgia",
       tab: "services",
     },
     {

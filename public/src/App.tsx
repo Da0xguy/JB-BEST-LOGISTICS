@@ -758,7 +758,7 @@ export default function App() {
                 <section className="landing-hero relative mb-0 min-h-[calc(100svh-4rem)] overflow-hidden shadow-lg sm:mb-8 sm:min-h-[620px] lg:min-h-[calc(100svh-4rem)] lg:max-h-[760px]">
                   <img
                     src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1800&q=85"
-                    alt="Packages ready for worldwide shipping"
+                    alt="Packages ready for local courier delivery"
                     className="absolute inset-0 h-full w-full object-cover object-center"
                   />
                   <div className="absolute inset-0 bg-slate-950/70" />
@@ -771,13 +771,9 @@ export default function App() {
                     </h1>
 
                     <p className="max-w-2xl text-base text-slate-200 font-normal leading-7 sm:text-lg">
-                      Compare rates and ship with{" "}
-                      <strong className="text-white">
-                        FedEx, UPS, and USPS
-                      </strong>{" "}
-                      all under one roof. Rent a private street address mailbox,
-                      book a certified notary, or schedule a pickup from
-                      wherever you are.
+                      Schedule local courier pickup and delivery across Georgia.
+                      Rent a private street address mailbox or book a certified
+                      notary, all with JB & Best Logistics.
                     </p>
 
                     {/* Fast Track Package Bar */}
@@ -825,10 +821,10 @@ export default function App() {
                         </div>
                         <div className="border-r border-white/20 px-3 sm:px-6">
                           <strong className="block text-lg font-bold sm:text-2xl">
-                            3+
+                            Local
                           </strong>
                           <span className="text-[10px] uppercase tracking-wider text-slate-300 sm:text-xs">
-                            Global carriers
+                            courier service
                           </span>
                         </div>
                         <div className="pl-3 sm:pl-6">
@@ -931,21 +927,9 @@ export default function App() {
                 </span>
               </div>
               <p className="text-sm text-gray-500 leading-relaxed max-w-sm">
-                Your trusted shipping store and private mailbox hub for
-                worldwide customers. Licensed, bonded, and insured in the State
-                of Georgia.
+                Local courier delivery, private mailbox services, and more in
+                Georgia.
               </p>
-              <div className="pt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                <span className="px-2.5 py-1 rounded-full bg-gray-100 font-medium">
-                  FedEx Authorized
-                </span>
-                <span className="px-2.5 py-1 rounded-full bg-gray-100 font-medium">
-                  UPS Service Center
-                </span>
-                <span className="px-2.5 py-1 rounded-full bg-gray-100 font-medium">
-                  USPS Approved
-                </span>
-              </div>
             </div>
             {/* Column 2: Quick Links */}
             <div className="space-y-2.5 text-sm">

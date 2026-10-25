@@ -69,7 +69,7 @@ const SERVICES = [
     duration: "20 mins",
     price: "Rates vary",
     icon: Truck,
-    desc: "Compare carrier options, schedule pickups, and get packing or shipping recommendations.",
+    desc: "Schedule local courier pickups and get packing recommendations.",
     checklist:
       "Bring package dimensions, destination ZIP, and any special handling or fragile item notes.",
     detailLabel: "Shipment Details",

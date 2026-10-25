@@ -29,10 +29,10 @@ export const AssociateDispatchView: React.FC<AssociateDispatchViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'shipments' | 'pickups'>('shipments');
   const [newTrackingNum, setNewTrackingNum] = useState('');
-  const [carrier, setCarrier] = useState<Carrier>('fedex');
+  const carrier: Carrier = 'jb_freight';
   const [recipientCity, setRecipientCity] = useState('Savannah');
   const [weight, setWeight] = useState(5.5);
-  const [service, setService] = useState('FedEx 2Day Air');
+  const [service, setService] = useState('JB Local Courier');
 
   const handleCreateShipment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,13 +185,9 @@ export const AssociateDispatchView: React.FC<AssociateDispatchViewProps> = ({
                   </label>
                   <select
                     value={carrier}
-                    onChange={(e) => setCarrier(e.target.value as Carrier)}
                     className="w-full px-2.5 py-1.5 rounded border border-gray-300 text-xs font-mono bg-gray-50 focus:bg-white focus:outline-none focus:border-blue-500"
                   >
-                    <option value="fedex">FedEx</option>
-                    <option value="ups">UPS</option>
-                    <option value="usps">USPS</option>
-                    <option value="jb_freight">JB Freight</option>
+                    <option value="jb_freight">JB Local Courier</option>
                   </select>
                 </div>
                 <div>

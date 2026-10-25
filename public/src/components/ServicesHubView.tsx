@@ -34,12 +34,12 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
 
   const faqs = [
     {
-      q: "Do you accept pre-printed return labels from Amazon, UPS, or FedEx?",
-      a: "Yes! You can drop off pre-labeled packages for FedEx, UPS, and USPS at no extra charge. We provide printed or digital drop-off receipts instantly.",
+      q: "What delivery service is currently available?",
+      a: "JB & Best currently offers local courier pickup and delivery within Georgia.",
     },
     {
       q: "What is the daily cutoff time for packages to ship out today?",
-      a: "Our daily carrier pickups are at 5:30 PM Monday through Friday. Packages dropped off or picked up before 5:30 PM depart on the evening carrier trucks.",
+      a: "Local courier pickup times are scheduled Monday through Friday. Choose an available time when you book.",
     },
     {
       q: "Can I use your mailbox service as my official business address?",
@@ -53,168 +53,40 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
 
   return (
     <div className="space-y-10">
-      {/* 1. Multi-Carrier Shipping Services */}
+      {/* 1. Local Courier Service */}
       <section className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
           <div>
             <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider">
-              Authorized Shipping
+              Local Delivery
             </span>
             <h2 className="text-2xl sm:text-3xl font-display font-bold text-gray-900 mt-1">
-              Compare & Ship with Leading Carriers
+              JB & Best Local Courier
             </h2>
             <p className="text-sm text-gray-500 mt-1">
-              We compare prices across FedEx, UPS, and USPS to find you the best
-              rate and fastest route.
+              Schedule a doorstep pickup and local delivery within Georgia.
             </p>
           </div>
           <div className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 shrink-0">
             <Clock className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Daily Pickup Cutoff: 5:30 PM EST</span>
+            <span>Local courier service</span>
           </div>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <article className="group relative h-36 overflow-hidden rounded-2xl animate-fade-up">
-            <img
-              src="https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?auto=format&fit=crop&w=700&q=80"
-              alt="Carefully packed shipping boxes"
-              className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/10 to-transparent" />
-            <div className="absolute inset-x-4 bottom-3 text-white">
-              <h3 className="text-sm font-bold">Packed with care</h3>
-              <p className="mt-0.5 text-xs text-white/80">
-                Fragile, oversized, and everyday items.
-              </p>
-            </div>
-          </article>
-          <article className="group relative h-36 overflow-hidden rounded-2xl animate-fade-up animation-delay-100">
-            <img
-              src="https://images.unsplash.com/photo-1605733160314-4fc7dac4bb16?auto=format&fit=crop&w=700&q=80"
-              alt="Cargo containers ready for transport"
-              className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/10 to-transparent" />
-            <div className="absolute inset-x-4 bottom-3 text-white">
-              <h3 className="text-sm font-bold">Ready for the road</h3>
-              <p className="mt-0.5 text-xs text-white/80">
-                Reliable handoff from counter to carrier.
-              </p>
-            </div>
-          </article>
-          <article className="group relative h-36 overflow-hidden rounded-2xl animate-fade-up animation-delay-200">
-            <img
-              src="https://images.unsplash.com/photo-1580674684081-7617fbf3d745?auto=format&fit=crop&w=700&q=80"
-              alt="Shipping boxes prepared for delivery"
-              className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/10 to-transparent" />
-            <div className="absolute inset-x-4 bottom-3 text-white">
-              <h3 className="text-sm font-bold">Delivered worldwide</h3>
-              <p className="mt-0.5 text-xs text-white/80">
-                Track every step with confidence.
-              </p>
-            </div>
-          </article>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-          <div className="bg-purple-50/60 rounded-2xl border-2 border-purple-200 p-5 space-y-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-purple-800">
-              FedEx
-            </span>
-            <div className="text-3xl font-bold text-gray-900">
-              $18.99{" "}
-              <span className="text-sm font-normal text-gray-500">/ start</span>
-            </div>
-            <p className="text-xs text-gray-600 leading-relaxed">
-              Fast domestic and international shipping with express and ground
-              options.
-            </p>
-            <ul className="text-xs text-gray-600 space-y-2 pt-3 border-t border-purple-200/60">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                <span>Next-day available</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                <span>Priority document shipping</span>
-              </li>
-            </ul>
-          </div>
-
-          <div className="bg-amber-50/60 rounded-2xl border-2 border-amber-200 p-5 space-y-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-800">
-              UPS
-            </span>
-            <div className="text-3xl font-bold text-gray-900">
-              $19.99{" "}
-              <span className="text-sm font-normal text-gray-500">/ start</span>
-            </div>
-            <p className="text-xs text-gray-600 leading-relaxed">
-              Reliable ground and air service for everyday packages and returns.
-            </p>
-            <ul className="text-xs text-gray-600 space-y-2 pt-3 border-t border-amber-200/60">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                <span>Ground delivery options</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                <span>Easy return support</span>
-              </li>
-            </ul>
-          </div>
-
-          <div className="bg-blue-50/60 rounded-2xl border-2 border-blue-200 p-5 space-y-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-800">
-              USPS
-            </span>
-            <div className="text-3xl font-bold text-gray-900">
-              $9.99{" "}
-              <span className="text-sm font-normal text-gray-500">/ start</span>
-            </div>
-            <p className="text-xs text-gray-600 leading-relaxed">
-              Affordable shipping for letters, flats, and small parcel delivery.
-            </p>
-            <ul className="text-xs text-gray-600 space-y-2 pt-3 border-t border-blue-200/60">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span>Flat-rate options</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span>Certified mail available</span>
-              </li>
-            </ul>
-          </div>
-
-          <div className="bg-emerald-50/60 rounded-2xl border-2 border-emerald-200 p-5 space-y-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
-              Doorstep
-            </span>
-            <div className="text-3xl font-bold text-gray-900">
-              $49.99{" "}
-              <span className="text-sm font-normal text-gray-500">/ start</span>
-            </div>
-            <p className="text-xs text-gray-600 leading-relaxed">
-              Same-day pickup, freight handling, and business delivery support.
-            </p>
-            <ul className="text-xs text-gray-600 space-y-2 pt-3 border-t border-emerald-200/60">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span>Door-to-door logistics</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span>Heavy freight coordination</span>
-              </li>
-            </ul>
-          </div>
+        <div className="bg-emerald-50/60 rounded-2xl border-2 border-emerald-200 p-5 space-y-3 max-w-xl">
+          <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+            JB & Best Courier
+          </span>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            Door-to-door pickup and delivery by our local courier team. Availability and pricing are confirmed when you schedule.
+          </p>
+          <button
+            onClick={onSchedulePickup}
+            className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
+          >
+            Schedule Local Pickup
+          </button>
         </div>
       </section>
-
       {/* 2. Private Mailbox Rentals */}
       <section className="bg-white rounded-3xl border border-gray-200/80 p-6 sm:p-8 shadow-xs space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
@@ -228,7 +100,7 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
             </h3>
             <p className="text-sm text-gray-500 mt-1">
               Give your business a professional street address. We accept
-              deliveries from all carriers and send text alerts when packages
+              deliveries and send text alerts when packages
               arrive.
             </p>
           </div>
@@ -293,7 +165,7 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span>Unlimited packages from all carriers</span>
+                <span>Unlimited package handling</span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
@@ -437,8 +309,7 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
               <div className="space-y-2">
                 <h4 className="text-base font-bold text-gray-900">Shipping</h4>
                 <p className="text-xs text-gray-500 leading-relaxed">
-                  Fast carrier comparisons for domestic and international
-                  shipping, packaging, and scheduled pickups.
+                  Local courier pickup and delivery, packaging, and scheduled pickups.
                 </p>
               </div>
               <p className="text-xs font-bold text-emerald-800 pt-1">

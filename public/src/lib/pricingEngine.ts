@@ -29,14 +29,6 @@ export interface PickupPricingResult {
   remainingBalance: number; // 50% remaining due on collection/arrival
 }
 
-const CARRIER_HUBS: Record<Carrier, string> = {
-  dhl: 'DHL Express Atlanta Worldwide Gateway (ATL Intermodal)',
-  fedex: 'FedEx Express Air & Ground Hub (Atlanta Airport Station)',
-  ups: 'UPS Smart Hub Atlanta Air Gateway',
-  usps: 'USPS International & Bulk Processing Facility (Crown Rd NDC)',
-  jb_freight: 'JB Logistics Central Freight Terminal (Piedmont Hub)',
-};
-
 export const classifyDestination = (state: string, country: string): DestinationType => {
   const normCountry = (country || 'USA').trim().toUpperCase();
   const isUSA = ['US', 'USA', 'UNITED STATES', 'UNITED STATES OF AMERICA'].includes(normCountry);
@@ -87,14 +79,9 @@ export const calculatePickupPricing = (input: PickupPricingInput): PickupPricing
   const mileageCost = Number((mileage * mileageRatePerMile).toFixed(2));
 
   const destinationType = classifyDestination(input.deliveryState, input.deliveryCountry);
-  const directCarrierTransfer = destinationType !== 'local';
-
-  // If going out of state or international, carrier direct tender surcharge is $12.50
-  const tenderFee = directCarrierTransfer ? 12.5 : 0.0;
-
-  const carrierHubName = directCarrierTransfer
-    ? CARRIER_HUBS[input.preferredCarrier] || CARRIER_HUBS.ups
-    : 'Local Georgia Courier Direct (JB Fleet)';
+  const directCarrierTransfer = false;
+  const tenderFee = 0;
+  const carrierHubName = 'JB & Best Local Courier';
 
   const subtotal = baseRate + mileageCost + tenderFee;
   const totalEstimatedCost = Number(subtotal.toFixed(2));

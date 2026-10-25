@@ -65,7 +65,15 @@ export const bookShipment: RequestHandler = async (request, response) => {
 
   if (!body.sender || !body.receiver || !packageDetails || !appointmentWindow) throw new ApiError(400, 'Sender, receiver, package, and appointment window are required');
   if (!isGeoPoint(body.pickupLocation) || !isGeoPoint(body.deliveryLocation)) throw new ApiError(400, 'Pickup and delivery must be GeoJSON Point locations');
-  if (!['standard', 'express', 'same_day', 'premium_overnight'].includes(deliveryOption) || !['road', 'air', 'sea'].includes(transport) || (body.carrier && !['fedex', 'ups', 'usps', 'dhl', 'jb_freight'].includes(body.carrier))) throw new ApiError(400, 'Invalid delivery option, transport, or carrier');
+  if (!['standard', 'express', 'same_day', 'premium_overnight'].includes(deliveryOption) || transport !== 'road' || (body.carrier && body.carrier !== 'jb_freight')) throw new ApiError(400, 'Only JB & Best local courier bookings are currently available');
+  const receiverState = String(body.receiver.state || '').trim().toUpperCase();
+  const receiverCountry = String(body.receiver.country || 'USA').trim().toUpperCase();
+  const senderState = String(body.sender.state || '').trim().toUpperCase();
+  const senderCountry = String(body.sender.country || 'USA').trim().toUpperCase();
+  const supportedCountries = ['US', 'USA', 'UNITED STATES', 'UNITED STATES OF AMERICA'];
+  if (!['GA', 'GEORGIA'].includes(receiverState) || !supportedCountries.includes(receiverCountry) || !['GA', 'GEORGIA'].includes(senderState) || !supportedCountries.includes(senderCountry)) {
+    throw new ApiError(400, 'JB & Best currently accepts courier pickups and deliveries within Georgia, USA');
+  }
 
   const dimensions = [packageDetails.length, packageDetails.width, packageDetails.height, packageDetails.weight].map(Number);
   if (!dimensions.every((value) => Number.isFinite(value) && value > 0)) throw new ApiError(400, 'Package dimensions and weight must be positive numbers');
