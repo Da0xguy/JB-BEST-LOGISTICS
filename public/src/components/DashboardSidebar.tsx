@@ -63,7 +63,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         </button>
       </div>
 
-      <div className="md:hidden">
+      <div className="relative md:hidden">
         <button
           type="button"
           aria-expanded={mobileMenuOpen}
@@ -83,7 +83,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           {mobileMenuOpen ? <ChevronUp className="h-4 w-4 shrink-0 text-slate-500" /> : <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />}
         </button>
         {mobileMenuOpen && (
-          <nav id={`${title.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}-mobile-sections`} className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2" aria-label={`${title} sections`}>
+          <nav id={`${title.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}-mobile-sections`} className="absolute left-0 right-0 top-full z-40 mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-xl" aria-label={`${title} sections`}>
             {items.map(({ id, label, icon: Icon }) => {
               const active = activeItem === id;
               return (

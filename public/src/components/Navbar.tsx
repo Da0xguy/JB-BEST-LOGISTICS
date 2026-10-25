@@ -324,7 +324,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Drawer */}
       {isMobileMenuOpen && (
-        <div className="nav-panel md:hidden border-t border-gray-200 bg-white px-4 pt-3 pb-6 space-y-4 shadow-lg">
+        <div className="nav-panel absolute left-0 right-0 top-full z-50 max-h-[calc(100svh-4rem)] overflow-y-auto border-t border-gray-200 bg-white px-4 pt-3 pb-6 shadow-lg md:hidden">
           {portal === "consumer" && (
             <div className="space-y-1">
               <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-2">
