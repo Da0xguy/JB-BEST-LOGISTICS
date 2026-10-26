@@ -15,6 +15,7 @@ export interface AdminUser {
   status: 'active' | 'suspended';
   mustChangePassword: boolean;
   branchId?: string;
+  riderAvailability?: { isActive: boolean; isAssigned: boolean };
 }
 
 export interface CustomerProfile {
@@ -221,6 +222,15 @@ export const changePassword = (newPassword: string) =>
 
 export const listAdminUsers = () =>
   apiRequest<{ users: AdminUser[] }>('/api/v1/admin/users');
+
+export const getDispatchSettings = () =>
+  apiRequest<{ autoDispatchEnabled: boolean }>('/api/v1/admin/dispatch-settings');
+
+export const setDispatchSettings = (autoDispatchEnabled: boolean) =>
+  apiRequest<{ autoDispatchEnabled: boolean }>('/api/v1/admin/dispatch-settings', {
+    method: 'PATCH',
+    body: JSON.stringify({ autoDispatchEnabled }),
+  });
 
 export const provisionAdminUser = (account: {
   name: string;

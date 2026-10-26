@@ -68,7 +68,8 @@ export const findBestAvailableRider = (
 export const autoAssignPickup = (
   pickup: PickupRequest,
   availableRiders: RiderCandidate[],
-  currentPickups: PickupRequest[] = []
+  currentPickups: PickupRequest[] = [],
+  preferredRiderId?: string,
 ): AutoDispatchResult => {
   if (pickup.status === 'completed' || pickup.status === 'cancelled') {
     return {
@@ -79,7 +80,9 @@ export const autoAssignPickup = (
     };
   }
 
-  const bestRider = findBestAvailableRider(pickup, availableRiders, currentPickups);
+  const bestRider = preferredRiderId
+    ? availableRiders.find((rider) => rider.id === preferredRiderId && isRiderCapableOfPickup(rider, pickup)) || null
+    : findBestAvailableRider(pickup, availableRiders, currentPickups);
 
   if (!bestRider) {
     return {

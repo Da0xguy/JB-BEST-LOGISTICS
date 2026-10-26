@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { DispatchOffer, Notification, RiderProfile, Shipment, User, type VehicleType } from '../models';
+import { DispatchOffer, DispatchSettings, Notification, RiderProfile, Shipment, User, type VehicleType } from '../models';
 import { emitToUser } from '../realtime';
 
 const OFFER_TIMEOUT_MS = 30_000;
@@ -55,6 +55,8 @@ const waitForOfferResponse = async (offerId: mongoose.Types.ObjectId, expiresAt:
  * rider acceptance transaction, which also prevents double assignment.
  */
 export const dispatchShipment = async (shipmentId: string, notify: OfferNotification = persistOfferNotification) => {
+  const dispatchSettings = await DispatchSettings.findOne().select('autoDispatchEnabled').lean();
+  if (dispatchSettings?.autoDispatchEnabled === false) return { status: 'auto_dispatch_disabled' as const };
   if (!mongoose.isValidObjectId(shipmentId)) throw new Error('Invalid shipment ID');
   const shipment = await Shipment.findById(shipmentId);
   if (!shipment) throw new Error('Shipment not found');
@@ -122,6 +124,8 @@ export const dispatchShipment = async (shipmentId: string, notify: OfferNotifica
 };
 
 export const dispatchQueuedShipments = async () => {
+  const dispatchSettings = await DispatchSettings.findOne().select('autoDispatchEnabled').lean();
+  if (dispatchSettings?.autoDispatchEnabled === false) return;
   if (isDispatchQueueRunning) return;
   isDispatchQueueRunning = true;
   try {

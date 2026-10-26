@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 import type { RequestHandler } from 'express';
 import { allowRoles, publicUser, type AuthRequest } from '../auth';
 import { calculateQuote } from '../pricing';
-import { ActivityLog, DispatchOffer, MailboxProfile, Notification, PickupJob, RiderProfile, Shipment, User, type DeliveryOption, type MailboxPlan, type MailboxProfileDocument, type Role, type ShipmentDocument, type ShipmentStatus, type UserDocument, type VehicleType } from '../models';
+import { ActivityLog, DispatchOffer, DispatchSettings, MailboxProfile, Notification, PickupJob, RiderProfile, Shipment, User, type DeliveryOption, type MailboxPlan, type MailboxProfileDocument, type Role, type ShipmentDocument, type ShipmentStatus, type UserDocument, type VehicleType } from '../models';
 import { dispatchQueuedShipments, dispatchShipment, eligibleVehiclesForPackage } from '../services/dispatchService';
 import { emitToShipment, emitToUser } from '../realtime';
 import { ApiError } from './apiError';
@@ -380,7 +380,22 @@ export const rejectRiderJob: RequestHandler = async (request, response) => {
 export const listAdminUsers: RequestHandler = async (_request, response) => {
   const users = await User.find({ role: { $in: ['admin', 'rider', 'warehouse', 'warehouse_staff'] } })
     .sort({ createdAt: -1 });
-  return response.json({ users: users.map(publicUser) });
+  const riderProfiles = await RiderProfile.find({ userId: { $in: users.filter((user) => user.role === 'rider').map((user) => user._id) } }).select('userId is_active is_assigned');
+  const riderAvailability = new Map(riderProfiles.map((profile) => [profile.userId.toString(), { isActive: profile.is_active, isAssigned: profile.is_assigned }]));
+  return response.json({ users: users.map((user) => ({ ...publicUser(user), ...(user.role === 'rider' ? { riderAvailability: riderAvailability.get(user.id) || { isActive: false, isAssigned: false } } : {}) })) });
+};
+
+export const getDispatchSettings: RequestHandler = async (_request, response) => {
+  const settings = await DispatchSettings.findOne().select('autoDispatchEnabled').lean();
+  return response.json({ autoDispatchEnabled: settings?.autoDispatchEnabled ?? true });
+};
+
+export const setDispatchSettings: RequestHandler = async (request, response) => {
+  const { autoDispatchEnabled } = request.body as { autoDispatchEnabled?: boolean };
+  if (typeof autoDispatchEnabled !== 'boolean') throw new ApiError(400, 'autoDispatchEnabled must be a boolean');
+  const settings = await DispatchSettings.findOneAndUpdate({}, { $set: { autoDispatchEnabled } }, { upsert: true, new: true, setDefaultsOnInsert: true });
+  if (autoDispatchEnabled) void dispatchQueuedShipments().catch((error: unknown) => console.error('Queued dispatch retry failed', error));
+  return response.json({ autoDispatchEnabled: settings.autoDispatchEnabled });
 };
 
 const mailboxResponse = (profile: MailboxProfileDocument, customer: UserDocument) => ({

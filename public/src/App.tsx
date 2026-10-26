@@ -767,7 +767,7 @@ export default function App() {
                   <div className="relative z-10 flex min-h-[calc(100svh-4rem)] max-w-4xl flex-col justify-center space-y-5 p-6 sm:min-h-[620px] sm:p-10 lg:min-h-[calc(100svh-4rem)] lg:p-14 animate-fade-up">
                     <h1 className="max-w-4xl text-3xl font-display font-bold text-white tracking-tight leading-[1.05] sm:text-5xl lg:text-6xl">
                       Shipping, Packing & Notary{" "}
-                      <span className="text-cyan-600">Made Simple</span>.
+                      <span className="text-red-600">Made Simple</span>.
                     </h1>
 
                     <p className="max-w-2xl text-base text-slate-200 font-normal leading-7 sm:text-lg">

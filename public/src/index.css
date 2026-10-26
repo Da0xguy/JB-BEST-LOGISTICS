@@ -3,6 +3,38 @@
 @theme {
   --font-sans: 'Plus Jakarta Sans', 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-display: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  /* JB & Best brand navy. Existing blue utility classes now use the logo's navy palette. */
+  --color-blue-50: #f1f5fb;
+  --color-blue-100: #e0e9f5;
+  --color-blue-200: #c3d3e9;
+  --color-blue-300: #97b3d6;
+  --color-blue-400: #648cbf;
+  --color-blue-500: #3d679d;
+  --color-blue-600: #17396c;
+  --color-blue-700: #102e5c;
+  --color-blue-800: #0b234a;
+  --color-blue-900: #081a39;
+  --color-blue-950: #051127;
+  --color-indigo-50: #f1f5fb;
+  --color-indigo-100: #e0e9f5;
+  --color-indigo-200: #c3d3e9;
+  --color-indigo-300: #97b3d6;
+  --color-indigo-400: #648cbf;
+  --color-indigo-500: #3d679d;
+  --color-indigo-600: #17396c;
+  --color-indigo-700: #102e5c;
+  --color-indigo-800: #0b234a;
+  --color-indigo-900: #081a39;
+  --color-sky-50: #f1f5fb;
+  --color-sky-100: #e0e9f5;
+  --color-sky-200: #c3d3e9;
+  --color-sky-300: #97b3d6;
+  --color-sky-400: #648cbf;
+  --color-sky-500: #3d679d;
+  --color-sky-600: #17396c;
+  --color-sky-700: #102e5c;
+  --color-sky-800: #0b234a;
+  --color-sky-900: #081a39;
 }
 
 html, body {
@@ -120,8 +152,8 @@ h1, h2, h3, .font-display {
 }
 
 .auth-input:focus {
-  border-color: rgb(59 130 246);
-  box-shadow: 0 0 0 4px rgb(219 234 254);
+  border-color: #17396c;
+  box-shadow: 0 0 0 4px rgb(195 211 233 / 55%);
 }
 
 @media (prefers-reduced-motion: reduce) {

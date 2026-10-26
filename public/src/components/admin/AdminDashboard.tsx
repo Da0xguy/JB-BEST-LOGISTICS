@@ -49,6 +49,8 @@ import {
   deleteStaffAccount,
   listAdminNotifications,
   listAdminPickupJobs,
+  getDispatchSettings,
+  setDispatchSettings,
   assignShipmentRider,
   AdminNotification,
   AdminPickupJob,
@@ -197,6 +199,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [activityCategoryFilter, setActivityCategoryFilter] =
     useState<string>("all");
   const [dispatchNotice, setDispatchNotice] = useState<string>("");
+  const [autoDispatchEnabled, setAutoDispatchEnabled] = useState(true);
+  const [isSavingDispatchSetting, setIsSavingDispatchSetting] = useState(false);
+  const [selectedRiderId, setSelectedRiderId] = useState("");
 
   const [invoiceFilter, setInvoiceFilter] = useState<
     "all" | "paid" | "pending"
@@ -245,6 +250,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   useEffect(() => {
     void refreshServerPickups();
+    getDispatchSettings().then(({ autoDispatchEnabled: enabled }) => setAutoDispatchEnabled(enabled)).catch(() => {});
     const timer = window.setInterval(() => void refreshServerPickups(), 30000);
     return () => window.clearInterval(timer);
   }, []);
@@ -280,9 +286,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const assignQueuedServerPickup = async (job: AdminPickupJob) => {
     const shipment = job.shipmentId;
-    const rider = activeRiders[0];
+    const rider = activeRiders.find((candidate) => candidate.id === selectedRiderId);
     if (!shipment || !rider) {
-      setDispatchNotice("Add or activate a rider account before assigning this pickup.");
+      setDispatchNotice("Choose an active rider who is open for delivery before assigning this pickup.");
       return;
     }
     try {
@@ -295,12 +301,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const activeRiders: RiderCandidate[] = adminUsers.filter(
-    (u) => u.role === "rider" && u.status === "active"
+    (u) => u.role === "rider" && u.status === "active" && u.riderAvailability?.isActive === true && u.riderAvailability.isAssigned === false
   );
 
+  const toggleAutoDispatch = async () => {
+    setIsSavingDispatchSetting(true);
+    try {
+      const result = await setDispatchSettings(!autoDispatchEnabled);
+      setAutoDispatchEnabled(result.autoDispatchEnabled);
+      setDispatchNotice(result.autoDispatchEnabled ? "Auto-dispatch is on. New pickups will be offered to available riders." : "Auto-dispatch is off. Assign pickups manually from the queue.");
+    } catch (error) {
+      setDispatchNotice(error instanceof Error ? error.message : "Unable to update auto-dispatch setting.");
+    } finally {
+      setIsSavingDispatchSetting(false);
+    }
+  };
+
   // Auto-Assign Single Pickup
-  const handleAutoAssignSingle = (pickup: PickupRequest) => {
-    const result = autoAssignPickup(pickup, activeRiders, localPickups);
+  const handleAutoAssignSingle = (pickup: PickupRequest, riderId?: string) => {
+    const result = autoAssignPickup(pickup, activeRiders, localPickups, riderId);
     if (!result.assignedRider) {
       setDispatchNotice(result.message);
       return;
@@ -548,7 +567,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
       {dispatchLoadError && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{dispatchLoadError}</p>}
-      {pendingServerPickups.length > 0 && <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><h2 className="font-bold text-amber-950">Awaiting rider assignment ({pendingServerPickups.length})</h2><ul className="mt-2 space-y-2">{pendingServerPickups.map((job) => <li key={job._id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3 text-sm"><span><strong className="font-mono">{job.shipmentId!.trackingId}</strong> · {job.shipmentId!.sender?.name || "Customer"} · {job.shipmentId!.receiver?.city || "Delivery"}</span><span className="text-xs text-gray-500">{job.scheduledAt ? new Date(job.scheduledAt).toLocaleString() : "Scheduled"}</span><button type="button" onClick={() => void assignQueuedServerPickup(job)} disabled={!activeRiders.length} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Assign to {activeRiders[0]?.name || "available rider"}</button></li>)}</ul><button type="button" onClick={() => void refreshServerPickups()} className="mt-3 text-xs font-semibold text-blue-700">Refresh pickup orders</button></section>}
+      {pendingServerPickups.length > 0 && <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><h2 className="font-bold text-amber-950">Awaiting rider assignment ({pendingServerPickups.length})</h2><ul className="mt-2 space-y-2">{pendingServerPickups.map((job) => <li key={job._id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3 text-sm"><span><strong className="font-mono">{job.shipmentId!.trackingId}</strong> · {job.shipmentId!.sender?.name || "Customer"} · {job.shipmentId!.receiver?.city || "Delivery"}<span className="block text-xs text-gray-500">{job.scheduledAt ? new Date(job.scheduledAt).toLocaleString() : "Scheduled"}</span></span><div className="flex flex-wrap items-center gap-2"><select aria-label={`Select rider for ${job.shipmentId!.trackingId}`} value={selectedRiderId} onChange={(event) => setSelectedRiderId(event.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs"><option value="">Choose available rider</option>{activeRiders.map((rider) => <option key={rider.id} value={rider.id}>{rider.name}</option>)}</select><button type="button" onClick={() => void assignQueuedServerPickup(job)} disabled={!activeRiders.length || !selectedRiderId} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Assign pickup</button></div></li>)}</ul><button type="button" onClick={() => void refreshServerPickups()} className="mt-3 text-xs font-semibold text-blue-700">Refresh pickup orders</button></section>}
       {/* Top Executive KPI Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-3xl border border-gray-200/80 p-5 shadow-xs space-y-2">
@@ -647,13 +666,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={handleAutoAssignAll}
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs shrink-0"
-            >
-              <Zap className="w-4 h-4 text-amber-300" />
-              <span>Auto-Assign All to Available Riders</span>
+            <button type="button" role="switch" aria-checked={autoDispatchEnabled} disabled={isSavingDispatchSetting} onClick={() => void toggleAutoDispatch()} className={`inline-flex items-center gap-3 rounded-xl border px-4 py-2.5 text-xs font-bold transition disabled:opacity-60 ${autoDispatchEnabled ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-gray-200 bg-gray-100 text-gray-700"}`}>
+              <span className={`relative h-5 w-9 rounded-full transition ${autoDispatchEnabled ? "bg-emerald-600" : "bg-gray-400"}`}><span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${autoDispatchEnabled ? "left-[18px]" : "left-0.5"}`} /></span>
+              <span>Auto-dispatch {autoDispatchEnabled ? "On" : "Off"}</span>
             </button>
           </div>
 
@@ -835,14 +850,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <Truck className="w-3.5 h-3.5" /> Rider: {p.assignedDriverId}
                           </span>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleAutoAssignSingle(p)}
-                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                          >
-                            <Zap className="w-3.5 h-3.5 text-amber-300" />
-                            <span>Auto-Assign to Available Rider</span>
-                          </button>
+                          <><select aria-label={`Choose rider for pickup ${p.trackingNumber || p.id}`} value={selectedRiderId} onChange={(event) => setSelectedRiderId(event.target.value)} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs"><option value="">Choose available rider</option>{activeRiders.map((rider) => <option key={rider.id} value={rider.id}>{rider.name}</option>)}</select><button type="button" onClick={() => handleAutoAssignSingle(p, selectedRiderId)} disabled={!selectedRiderId} className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"><span>Assign pickup</span></button></>
                         )}
                       </div>
                     </div>

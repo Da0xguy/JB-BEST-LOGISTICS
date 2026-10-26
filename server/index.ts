@@ -502,8 +502,21 @@ app.post('/api/shipments/:id/assign-rider', requireAuth, allowRoles('admin', 'wa
   const { riderId, scheduledAt } = req.body as { riderId: string; scheduledAt: string };
   const rider = await User.findOne({ _id: riderId, role: 'rider', status: 'active' });
   if (!rider) return res.status(400).json({ error: 'Active rider not found' });
-  const shipment = await Shipment.findByIdAndUpdate(req.params.id, { assignedRiderId: rider._id, status: 'assigned' }, { new: true });
-  if (!shipment) return res.status(404).json({ error: 'Shipment not found' });
+  const availableRider = await RiderProfile.findOneAndUpdate(
+    { userId: rider._id, is_active: true, is_assigned: false },
+    { $set: { is_assigned: true } },
+    { new: true },
+  );
+  if (!availableRider) return res.status(409).json({ error: 'Rider is not active and open for delivery' });
+  const shipment = await Shipment.findOneAndUpdate(
+    { _id: req.params.id, status: 'booked', assignedRiderId: { $exists: false } },
+    { assignedRiderId: rider._id, status: 'assigned' },
+    { new: true },
+  );
+  if (!shipment) {
+    await RiderProfile.updateOne({ userId: rider._id }, { $set: { is_assigned: false } });
+    return res.status(409).json({ error: 'Pickup is no longer awaiting assignment' });
+  }
   const pickupJob = await PickupJob.findOneAndUpdate(
     { shipmentId: shipment._id, status: 'queued' },
     { $set: { riderId: rider._id, scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(), status: 'assigned' } },

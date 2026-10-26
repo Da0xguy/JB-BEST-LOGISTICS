@@ -323,4 +323,6 @@ export const PickupJob: Model<PickupJobDocument> = mongoose.models.PickupJob || 
 export const Notification = mongoose.models.Notification || mongoose.model('Notification', notificationSchema);
 export const ActivityLog = mongoose.models.ActivityLog || mongoose.model('ActivityLog', activityLogSchema);
 export const DispatchOffer: Model<DispatchOfferDocument> = mongoose.models.DispatchOffer || mongoose.model<DispatchOfferDocument>('DispatchOffer', dispatchOfferSchema);
+const dispatchSettingsSchema = new Schema({ autoDispatchEnabled: { type: Boolean, default: true } }, { timestamps: true });
+export const DispatchSettings = mongoose.models.DispatchSettings || mongoose.model('DispatchSettings', dispatchSettingsSchema);
 export const Payment = mongoose.models.Payment || mongoose.model('Payment', paymentSchema);
