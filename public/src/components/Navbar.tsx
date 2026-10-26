@@ -179,9 +179,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center gap-2.5 cursor-pointer select-none group shrink-0"
             title="JB & Best Logistics"
           >
-            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs group-hover:bg-blue-700 transition">
-              <Package className="w-5 h-5 text-white" />
-            </div>
+            <img src="/assets/logo.jpg" alt="JB & Best Logistics logo" className="h-10 w-10 shrink-0 rounded-xl object-cover shadow-xs" />
             <div className="flex items-baseline gap-1.5">
               <span className="font-display font-bold text-lg text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">
                 JB & Best

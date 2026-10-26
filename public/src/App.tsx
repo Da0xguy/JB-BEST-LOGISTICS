@@ -38,7 +38,6 @@ import {
   Search,
   CheckCircle2,
   Calendar,
-  Package,
   Clock,
   ArrowRight,
   Sparkles,
@@ -595,9 +594,7 @@ export default function App() {
           <>
             <header className="flex h-16 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 sm:gap-4 sm:px-8">
               <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white">
-                  <Package className="h-5 w-5" />
-                </span>
+                <img src="/assets/logo.jpg" alt="JB & Best Logistics logo" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
                 <span className="truncate font-display text-sm font-bold text-slate-900 sm:text-base">
                   JB & Best Logistics
                 </span>
@@ -755,86 +752,58 @@ export default function App() {
             <>
               {/* Consumer Welcome Hero (Displayed on the Home & Services view) */}
               {activeTab === "services" && (
-                <section className="landing-hero relative mb-0 min-h-[calc(100svh-4rem)] overflow-hidden shadow-lg sm:mb-8 sm:min-h-[620px] lg:min-h-[calc(100svh-4rem)] lg:max-h-[760px]">
-                  <img
-                    src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1800&q=85"
-                    alt="Packages ready for local courier delivery"
-                    className="absolute inset-0 h-full w-full object-cover object-center"
-                  />
-                  <div className="absolute inset-0 bg-slate-950/70" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/60 to-slate-950/20" />
-
-                  <div className="relative z-10 flex min-h-[calc(100svh-4rem)] max-w-4xl flex-col justify-center space-y-5 p-6 sm:min-h-[620px] sm:p-10 lg:min-h-[calc(100svh-4rem)] lg:p-14 animate-fade-up">
-                    <h1 className="max-w-4xl text-3xl font-display font-bold text-white tracking-tight leading-[1.05] sm:text-5xl lg:text-6xl">
-                      Shipping, Packing & Notary{" "}
-                      <span className="text-red-600">Made Simple</span>.
-                    </h1>
-
-                    <p className="max-w-2xl text-base text-slate-200 font-normal leading-7 sm:text-lg">
-                      Schedule local courier pickup and delivery across Georgia.
-                      Rent a private street address mailbox or book a certified
-                      notary, all with JB & Best Logistics.
-                    </p>
-
-                    {/* Fast Track Package Bar */}
-                    <div className="w-full max-w-3xl pt-2">
-                      <form
-                        onSubmit={handleHeroTrackSubmit}
-                        className="flex flex-col gap-3 sm:flex-row"
-                      >
-                        <div className="relative flex-1">
-                          <Search className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-                          <input
-                            type="text"
-                            value={heroSearch}
-                            maxLength={20}
-                            autoCapitalize="characters"
-                            onChange={(e) =>
-                              setHeroSearch(
-                                e.target.value
-                                  .replace(/[^a-z0-9]/gi, "")
-                                  .slice(0, 20)
-                                  .toUpperCase(),
-                              )
-                            }
-                            placeholder="Enter 20-character tracking ID..."
-                            className="w-full rounded-2xl border border-white/70 bg-white py-4 pl-12 pr-4 text-sm font-medium text-gray-900 shadow-xl outline-none transition placeholder:text-gray-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 sm:text-base"
-                          />
-                        </div>
-                        <button
-                          type="submit"
-                          className="flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-7 py-4 text-sm font-bold text-white shadow-xl transition hover:bg-blue-700 hover:-translate-y-0.5 cursor-pointer sm:text-base"
-                        >
-                          <span>Track Package</span>
-                          <ArrowRight className="w-4 h-4" />
+                <section className="landing-hero bg-white">
+                  <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:gap-14 lg:px-8 lg:py-16">
+                    <div className="animate-fade-up">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-blue-800">
+                        <MapPin className="h-3.5 w-3.5 text-red-600" />
+                        Your Georgia shipping partner
+                      </span>
+                      <h1 className="mt-5 max-w-xl font-display text-4xl font-bold leading-[1.04] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+                        Shipping made{" "}
+                        <span className="text-red-600">personal.</span>
+                      </h1>
+                      <p className="mt-5 max-w-lg text-base leading-7 text-slate-600 sm:text-lg">
+                        Local courier pickup and delivery, private mailboxes, and everyday business services—all with a team close to home.
+                      </p>
+                      <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                        <button type="button" onClick={() => navigateConsumerTab("pickup")} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800">
+                          Schedule a pickup <ArrowRight className="h-4 w-4" />
                         </button>
-                      </form>
+                        <button type="button" onClick={() => document.getElementById("services-overview")?.scrollIntoView({ behavior: "smooth" })} className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-800 transition hover:border-blue-400 hover:text-blue-800">
+                          Explore our services
+                        </button>
+                      </div>
+                      <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 border-t border-slate-200 pt-5 text-sm font-semibold text-slate-700">
+                        <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-red-600" /> Georgia local delivery</span>
+                        <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-red-600" /> Pickup at your door</span>
+                      </div>
+                    </div>
+                    <div className="relative min-h-[300px] overflow-hidden rounded-[28px] bg-slate-200 sm:min-h-[420px] lg:min-h-[500px]">
+                      <img src="https://images.unsplash.com/photo-1566576721346-d4a3b4eaeb55?auto=format&fit=crop&w=1400&q=85" alt="Packages prepared for a local delivery" className="absolute inset-0 h-full w-full object-cover object-center" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent" />
+                      <div className="absolute bottom-5 left-5 right-5 rounded-2xl border border-white/30 bg-white/95 p-4 shadow-xl backdrop-blur sm:bottom-7 sm:left-7 sm:right-7 sm:p-5">
+                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-700">Close to home. Ready to go.</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-900 sm:text-base">Book a doorstep pickup anywhere in our Georgia service area.</p>
+                      </div>
+                    </div>
+                  </div>
 
-                      <div className="mt-6 grid max-w-2xl grid-cols-3 border-y border-white/20 py-3 text-white">
-                        <div className="border-r border-white/20 pr-3 sm:pr-6">
-                          <strong className="block text-lg font-bold sm:text-2xl">
-                            24/7
-                          </strong>
-                          <span className="text-[10px] uppercase tracking-wider text-slate-300 sm:text-xs">
-                            Mailbox access
-                          </span>
+                  <div className="border-y border-slate-200 bg-slate-50">
+                    <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[1fr_auto] lg:items-center lg:px-8">
+                      <form onSubmit={handleHeroTrackSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <div className="flex-1">
+                          <label htmlFor="hero-tracking-number" className="mb-2 block text-sm font-bold text-slate-900">Track a package</label>
+                          <div className="relative">
+                            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                            <input id="hero-tracking-number" type="text" value={heroSearch} maxLength={20} autoCapitalize="characters" onChange={(e) => setHeroSearch(e.target.value.replace(/[^a-z0-9]/gi, "").slice(0, 20).toUpperCase())} placeholder="Enter your tracking number" className="w-full rounded-xl border border-slate-300 bg-white py-3.5 pl-12 pr-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100" />
+                          </div>
                         </div>
-                        <div className="border-r border-white/20 px-3 sm:px-6">
-                          <strong className="block text-lg font-bold sm:text-2xl">
-                            Local
-                          </strong>
-                          <span className="text-[10px] uppercase tracking-wider text-slate-300 sm:text-xs">
-                            courier service
-                          </span>
-                        </div>
-                        <div className="pl-3 sm:pl-6">
-                          <strong className="block text-lg font-bold sm:text-2xl">
-                            5:30 PM
-                          </strong>
-                          <span className="text-[10px] uppercase tracking-wider text-slate-300 sm:text-xs">
-                            Daily cutoff
-                          </span>
-                        </div>
+                        <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-700 px-7 py-3.5 text-sm font-bold text-white transition hover:bg-red-800">Track <ArrowRight className="h-4 w-4" /></button>
+                      </form>
+                      <div className="flex flex-wrap gap-2 text-sm font-semibold">
+                        <button type="button" onClick={() => navigateConsumerTab("appointment")} className="rounded-lg px-3 py-2 text-blue-800 transition hover:bg-blue-100">Mailbox & in-store services</button>
+                        <button type="button" onClick={() => navigateConsumerTab("profile")} className="rounded-lg px-3 py-2 text-blue-800 transition hover:bg-blue-100">My account</button>
                       </div>
                     </div>
                   </div>
@@ -844,6 +813,7 @@ export default function App() {
               {/* Dynamic Consumer Views */}
               <div
                 key={activeTab}
+                id={activeTab === "services" ? "services-overview" : undefined}
                 className="page-transition max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8"
               >
                 {activeTab === "services" && (
@@ -919,9 +889,7 @@ export default function App() {
             {/* Column 1: Brand & Bio */}
             <div className="lg:col-span-2 space-y-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
-                  JB
-                </div>
+                <img src="/assets/logo.jpg" alt="JB & Best Logistics logo" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
                 <span className="font-display font-bold text-gray-900 text-base">
                   JB & Best Logistics LLC
                 </span>
