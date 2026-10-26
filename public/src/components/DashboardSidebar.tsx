@@ -43,9 +43,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       <div className={`mb-5 hidden items-center md:flex ${collapsed ? "justify-center" : "justify-between px-1"}`}>
         {!collapsed && (
           <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white">
-              <LayoutDashboard className="h-4 w-4" />
-            </span>
+            <img src="/logo.jpg" alt="JB & Best Logistics logo" className="h-10 w-10 shrink-0 rounded-xl object-cover shadow-xs" />
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-slate-900">{title}</p>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Workspace</p>

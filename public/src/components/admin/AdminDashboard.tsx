@@ -56,6 +56,7 @@ import {
   AdminPickupJob,
 } from "../../lib/api";
 import { AdminShipmentAssignmentsView } from "./AdminShipmentAssignmentsView";
+import { CountUp } from "../ScrollEffects";
 import {
   autoAssignPickup,
   autoAssignAllPendingPickups,
@@ -600,7 +601,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-display font-bold text-gray-900">
-            {totalParcels} Parcels
+            <CountUp value={totalParcels} ariaLabel={`${totalParcels} active parcels`} /> Parcels
           </div>
           <p className="text-xs text-gray-500">JB & Best courier deliveries</p>
         </div>
@@ -615,7 +616,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-display font-bold text-gray-900">
-            {localPickups.length} Pickups
+            <CountUp value={localPickups.length} ariaLabel={`${localPickups.length} pickups`} /> Pickups
           </div>
           <p className="text-xs text-amber-700 font-medium">Local courier bookings</p>
         </div>
@@ -630,7 +631,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-display font-bold text-gray-900">
-            {activeRiders.length} Active Riders
+            <CountUp value={activeRiders.length} ariaLabel={`${activeRiders.length} active riders`} /> Active Riders
           </div>
           <p className="text-xs text-gray-500">
             {adminUsers.length} total staff accounts provisioned

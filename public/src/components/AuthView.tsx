@@ -5,7 +5,6 @@ import {
   EyeOff,
   LockKeyhole,
   Mail,
-  Package,
   ShieldCheck,
   User,
   X,
@@ -256,9 +255,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
       <div className="auth-shell relative z-10 mx-auto grid min-h-[calc(100svh-4rem)] max-w-6xl overflow-hidden border-x border-white/15 bg-white/10 shadow-2xl backdrop-blur-[2px] sm:min-h-[calc(100svh-7rem)] sm:border lg:grid-cols-[1.05fr_0.95fr]">
         <section className="relative hidden overflow-hidden bg-slate-950/20 p-10 text-white lg:flex lg:flex-col lg:justify-between">
           <div className="relative z-10 flex items-center gap-2.5">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600">
-              <Package className="h-5 w-5" />
-            </span>
+            <img src="/logo.jpg" alt="JB & Best Logistics logo" className="h-12 w-12 shrink-0 rounded-xl object-cover shadow-sm" />
             <span className="font-display text-lg font-bold">
               JB & Best Logistics
             </span>
@@ -293,7 +290,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
         </section>
 
         <section className="relative flex items-center bg-white/95 px-5 py-7 backdrop-blur-xl sm:px-10 sm:py-10 lg:px-12">
-          <div className="absolute inset-x-0 top-0 h-1 bg-blue-600 lg:hidden" />
+          <div className="absolute inset-x-0 top-0 h-1 bg-red-700 lg:hidden" />
           <button
             onClick={onBack}
             className="absolute right-5 top-5 rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
@@ -303,9 +300,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
           </button>
           <div className="mx-auto w-full max-w-md">
             <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white">
-                <Package className="h-4 w-4" />
-              </span>
+              <img src="/logo.jpg" alt="JB & Best Logistics logo" className="h-10 w-10 shrink-0 rounded-xl object-cover shadow-sm" />
               <span className="font-display text-base font-bold text-slate-900">
                 JB & Best{" "}
                 <span className="font-medium text-slate-500">Logistics</span>
@@ -318,7 +313,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
               <ArrowLeft className="h-4 w-4" /> Back to website
             </button>
             <div className="mb-7">
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
+              <span className="text-xs font-bold uppercase tracking-wider text-red-700">
                 {mode === "customer" ? "Customer account" : `${mode} portal`}
               </span>
               <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { CountUp, ScrollReveal } from "./ScrollEffects";
 import {
   Truck,
   Box,
@@ -54,6 +55,7 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
   return (
     <div className="space-y-10">
       {/* 1. Shipping Services */}
+      <ScrollReveal>
       <section className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
           <div>
@@ -87,7 +89,9 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
           </button>
         </div>
       </section>
+      </ScrollReveal>
       {/* 2. Private Mailbox Rentals */}
+      <ScrollReveal>
       <section className="bg-white rounded-3xl border border-gray-200/80 p-6 sm:p-8 shadow-xs space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
           <div>
@@ -163,7 +167,7 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span>24/7 key fob lobby access</span>
+                <span><CountUp value={24} suffix="/7" ariaLabel="24 hours a day, seven days a week" /> key fob lobby access</span>
               </li>
             </ul>
           </div>
@@ -195,8 +199,10 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
           </div>
         </div>
       </section>
+      </ScrollReveal>
 
       {/* 3. In-Store Walk-In Services */}
+      <ScrollReveal>
       <section className="space-y-4">
         <div>
           <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider">
@@ -395,8 +401,10 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
           </div>
         </div>
       </section>
+      </ScrollReveal>
 
       {/* 4. Frequently Asked Questions */}
+      <ScrollReveal>
       <section className="bg-white rounded-3xl border border-gray-200/80 p-6 sm:p-8 shadow-xs space-y-4">
         <div className="flex items-center gap-2">
           <HelpCircle className="w-5 h-5 text-blue-600" />
@@ -435,6 +443,7 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
           })}
         </div>
       </section>
+      </ScrollReveal>
     </div>
   );
 };

@@ -11,6 +11,7 @@ import { RiderDashboard } from "./components/RiderDashboard";
 import { AdminDashboard } from "./components/admin/AdminDashboard";
 import { ArchitectureModal } from "./components/ArchitectureModal";
 import { AuthView } from "./components/AuthView";
+import { ScrollReveal } from "./components/ScrollEffects";
 import { CustomerProfileView } from "./components/CustomerProfileView";
 import {
   getCurrentUser,
@@ -594,7 +595,7 @@ export default function App() {
           <>
             <header className="flex h-16 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 sm:gap-4 sm:px-8">
               <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                <img src="/assets/logo.jpg" alt="JB & Best Logistics logo" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+                <img src="/logo.jpg" alt="JB & Best Logistics logo" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
                 <span className="truncate font-display text-sm font-bold text-slate-900 sm:text-base">
                   JB & Best Logistics
                 </span>
@@ -614,6 +615,7 @@ export default function App() {
                 Sign out
               </button>
             </header>
+            <ScrollReveal className="w-full">
             <main className="w-full px-0 py-0">
               {portalMode === "rider" ? (
                 <RiderDashboard />
@@ -639,6 +641,7 @@ export default function App() {
                 />
               )}
             </main>
+            </ScrollReveal>
           </>
         ) : (
           <main className="flex min-h-screen items-center justify-center px-4 text-sm font-semibold text-slate-600">
@@ -889,7 +892,7 @@ export default function App() {
             {/* Column 1: Brand & Bio */}
             <div className="lg:col-span-2 space-y-3">
               <div className="flex items-center gap-2.5">
-                <img src="/assets/logo.jpg" alt="JB & Best Logistics logo" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+                <img src="/logo.jpg" alt="JB & Best Logistics logo" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
                 <span className="font-display font-bold text-gray-900 text-base">
                   JB & Best Logistics LLC
                 </span>

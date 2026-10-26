@@ -9,6 +9,7 @@ import {
   Truck,
 } from "lucide-react";
 import { QrCameraScanner, extractTrackingId } from "./QrCameraScanner";
+import { CountUp } from "./ScrollEffects";
 import {
   ApiError,
   acceptRiderOffer,
@@ -338,7 +339,7 @@ export const RiderDashboard: React.FC = () => {
             My assigned pickups
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            {activeJobs.length} active deliveries
+            <CountUp value={activeJobs.length} ariaLabel={`${activeJobs.length} active deliveries`} /> active deliveries
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -358,7 +359,7 @@ export const RiderDashboard: React.FC = () => {
             type="button"
             onClick={() => void toggleAvailability()}
             disabled={availabilityBusy}
-            className={`rounded-lg px-3 py-2 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60 ${isOnline ? "bg-gray-700 hover:bg-gray-800" : "bg-emerald-600 hover:bg-emerald-700"}`}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60 ${isOnline ? "bg-gray-700 hover:bg-gray-800" : "bg-blue-700 hover:bg-blue-800"}`}
           >
             {availabilityBusy
               ? "Updating..."
@@ -476,7 +477,7 @@ export const RiderDashboard: React.FC = () => {
                   type="button"
                   onClick={() => void handleAcceptOffer(offer._id)}
                   disabled={acceptingOfferId !== null}
-                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60"
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-wait disabled:opacity-60"
                 >
                   <Check className="h-4 w-4" />
                   {acceptingOfferId === offer._id
