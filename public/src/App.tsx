@@ -34,6 +34,8 @@ import {
   MapPin,
   Phone,
   Mail,
+  MessageCircle,
+  X,
   ShieldCheck,
   Truck,
   Search,
@@ -56,6 +58,64 @@ interface ToastItem {
   title: string;
   message: string;
   variant: ToastVariant;
+}
+
+function FloatingSupport() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="fixed bottom-5 right-4 z-[90] flex flex-col items-end gap-3 sm:bottom-6 sm:right-6">
+      {isOpen && (
+        <section
+          id="customer-support-panel"
+          role="dialog"
+          aria-label="Customer support options"
+          className="w-[min(88vw,340px)] rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl animate-fade-up"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-base font-bold text-slate-900">How can we help?</p>
+              <p className="mt-1 text-sm text-slate-500">Contact the JB & Best support team.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              aria-label="Close support options"
+              className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="mt-4 grid gap-2">
+            <a
+              href="tel:+19498441280"
+              className="inline-flex items-center gap-3 rounded-xl bg-blue-50 px-3.5 py-3 text-sm font-semibold text-blue-900 transition hover:bg-blue-100"
+            >
+              <Phone className="h-4 w-4 text-red-700" />
+              Call +1 949-844-1280
+            </a>
+            <a
+              href="mailto:jb.bestlogistics@gmail.com"
+              className="inline-flex items-center gap-3 rounded-xl bg-slate-50 px-3.5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-100"
+            >
+              <Mail className="h-4 w-4 text-red-700" />
+              Email customer support
+            </a>
+          </div>
+        </section>
+      )}
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? "customer-support-panel" : undefined}
+        onClick={() => setIsOpen((open) => !open)}
+        className="inline-flex min-h-14 items-center gap-2.5 rounded-full bg-red-700 px-5 text-sm font-bold text-white shadow-xl shadow-slate-950/20 transition hover:-translate-y-0.5 hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+      >
+        {isOpen ? <X className="h-5 w-5" /> : <MessageCircle className="h-5 w-5" />}
+        <span>{isOpen ? "Close" : "Customer support"}</span>
+      </button>
+    </div>
+  );
 }
 
 function ToastHost({
@@ -648,6 +708,7 @@ export default function App() {
             Checking portal access...
           </main>
         )}
+        <FloatingSupport />
         <ArchitectureModal
           isOpen={portalMode === "admin" && isArchitectureOpen}
           onClose={() => setIsArchitectureOpen(false)}
@@ -755,39 +816,39 @@ export default function App() {
             <>
               {/* Consumer Welcome Hero (Displayed on the Home & Services view) */}
               {activeTab === "services" && (
-                <section className="landing-hero bg-white">
-                  <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:gap-14 lg:px-8 lg:py-16">
-                    <div className="animate-fade-up">
-                      <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-blue-800">
-                        <MapPin className="h-3.5 w-3.5 text-red-600" />
+                <section className="landing-hero relative isolate overflow-hidden bg-slate-950">
+                  <img
+                    src="https://images.unsplash.com/photo-1566576721346-d4a3b4eaeb55?auto=format&fit=crop&w=2000&q=85"
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 h-full w-full object-cover object-center"
+                  />
+                  <div className="absolute inset-0 bg-slate-950/55" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/60 to-slate-950/20" />
+                  <div className="relative mx-auto flex min-h-[440px] max-w-7xl items-center px-4 py-12 sm:min-h-[520px] sm:px-6 sm:py-16 lg:min-h-[590px] lg:px-8">
+                    <div className="animate-fade-up max-w-2xl">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-white backdrop-blur">
+                        <MapPin className="h-3.5 w-3.5 text-red-400" />
                         Shipping with worldwide reach
                       </span>
-                      <h1 className="mt-5 max-w-xl font-display text-4xl font-bold leading-[1.04] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+                      <h1 className="mt-5 font-display text-4xl font-bold leading-[1.04] tracking-tight text-white sm:text-5xl lg:text-7xl">
                         Shipping made{" "}
-                        <span className="text-red-600">personal.</span>
+                        <span className="text-red-400">personal.</span>
                       </h1>
-                      <p className="mt-5 max-w-lg text-base leading-7 text-slate-600 sm:text-lg">
+                      <p className="mt-5 max-w-xl text-base leading-7 text-slate-200 sm:text-lg">
                         From getting your package ready to sending it on its way, find shipping, mailbox, and business services backed by personal support.
                       </p>
                       <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                        <button type="button" onClick={() => navigateConsumerTab("pickup")} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800">
+                        <button type="button" onClick={() => navigateConsumerTab("pickup")} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-700 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-red-800">
                           Schedule a pickup <ArrowRight className="h-4 w-4" />
                         </button>
-                        <button type="button" onClick={() => document.getElementById("services-overview")?.scrollIntoView({ behavior: "smooth" })} className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-800 transition hover:border-blue-400 hover:text-blue-800">
+                        <button type="button" onClick={() => document.getElementById("services-overview")?.scrollIntoView({ behavior: "smooth" })} className="inline-flex items-center justify-center rounded-xl border border-white/60 bg-white/10 px-5 py-3 text-sm font-bold text-white backdrop-blur transition hover:bg-white hover:text-slate-900">
                           Explore our services
                         </button>
                       </div>
-                      <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 border-t border-slate-200 pt-5 text-sm font-semibold text-slate-700">
-                        <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-red-600" /> Worldwide shipping options</span>
-                        <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-red-600" /> Personal shipping support</span>
-                      </div>
-                    </div>
-                    <div className="relative min-h-[300px] overflow-hidden rounded-[28px] bg-slate-200 sm:min-h-[420px] lg:min-h-[500px]">
-                      <img src="https://images.unsplash.com/photo-1566576721346-d4a3b4eaeb55?auto=format&fit=crop&w=1400&q=85" alt="Packages prepared for a local delivery" className="absolute inset-0 h-full w-full object-cover object-center" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent" />
-                      <div className="absolute bottom-5 left-5 right-5 rounded-2xl border border-white/30 bg-white/95 p-4 shadow-xl backdrop-blur sm:bottom-7 sm:left-7 sm:right-7 sm:p-5">
-                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-700">Close to home. Ready to go.</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900 sm:text-base">Get help preparing and sending packages to destinations around the world.</p>
+                      <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 border-t border-white/25 pt-5 text-sm font-semibold text-white">
+                        <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-red-400" /> Worldwide shipping options</span>
+                        <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-red-400" /> Personal shipping support</span>
                       </div>
                     </div>
                   </div>
@@ -1002,6 +1063,7 @@ export default function App() {
       </footer>
 
       {/* Code Architecture Explorer Modal */}
+      <FloatingSupport />
       <ArchitectureModal
         isOpen={isArchitectureOpen}
         onClose={() => setIsArchitectureOpen(false)}
