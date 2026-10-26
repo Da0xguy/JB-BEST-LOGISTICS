@@ -35,7 +35,7 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
   const faqs = [
     {
       q: "What delivery service is currently available?",
-      a: "JB & Best currently offers local courier pickup and delivery within Georgia.",
+      a: "JB & Best offers shipping services for destinations around the world, along with scheduled pickup options.",
     },
     {
       q: "What is the daily cutoff time for packages to ship out today?",
@@ -53,18 +53,18 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
 
   return (
     <div className="space-y-10">
-      {/* 1. Local Courier Service */}
+      {/* 1. Shipping Services */}
       <section className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
           <div>
             <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider">
-              Local Delivery
+              Shipping Services
             </span>
             <h2 className="text-2xl sm:text-3xl font-display font-bold text-gray-900 mt-1">
-              JB & Best Local Courier
+              Shipping, Your Way
             </h2>
             <p className="text-sm text-gray-500 mt-1">
-              Schedule a doorstep pickup and local delivery within Georgia.
+              Arrange package pickup and explore shipping options for destinations around the world.
             </p>
           </div>
           <div className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 shrink-0">
@@ -77,7 +77,7 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
             JB & Best Courier
           </span>
           <p className="text-sm text-gray-700 leading-relaxed">
-            Door-to-door pickup and delivery by our local courier team. Pickup hours are Monday–Saturday, 8:00 AM–9:00 PM, and Sunday, 12:00 PM–8:00 PM. Pickup service is $0 for now.
+            Our team can help coordinate package pickup and delivery. Pickup hours are Monday–Saturday, 8:00 AM–9:00 PM, and Sunday, 12:00 PM–8:00 PM. Pickup service is $0 for now.
           </p>
           <button
             onClick={onSchedulePickup}
@@ -300,7 +300,7 @@ export const ServicesHubView: React.FC<ServicesHubViewProps> = ({
               <div className="space-y-2">
                 <h4 className="text-base font-bold text-gray-900">Shipping</h4>
                 <p className="text-xs text-gray-500 leading-relaxed">
-                  Local courier pickup and delivery, packaging, and scheduled pickups.
+                  Shipping options for domestic and international destinations, packaging, and scheduled pickups.
                 </p>
               </div>
               <p className="text-xs font-bold text-emerald-800 pt-1">

@@ -59,7 +59,7 @@ const MILESTONES: {
   {
     status: "out_for_delivery",
     label: "Out for Delivery",
-    description: "With local courier",
+    description: "With delivery partner",
   },
   {
     status: "delivered",

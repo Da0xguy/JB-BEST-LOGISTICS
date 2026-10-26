@@ -757,14 +757,14 @@ export default function App() {
                     <div className="animate-fade-up">
                       <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-blue-800">
                         <MapPin className="h-3.5 w-3.5 text-red-600" />
-                        Your Georgia shipping partner
+                        Shipping with worldwide reach
                       </span>
                       <h1 className="mt-5 max-w-xl font-display text-4xl font-bold leading-[1.04] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
                         Shipping made{" "}
                         <span className="text-red-600">personal.</span>
                       </h1>
                       <p className="mt-5 max-w-lg text-base leading-7 text-slate-600 sm:text-lg">
-                        Local courier pickup and delivery, private mailboxes, and everyday business services—all with a team close to home.
+                        From getting your package ready to sending it on its way, find shipping, mailbox, and business services backed by personal support.
                       </p>
                       <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                         <button type="button" onClick={() => navigateConsumerTab("pickup")} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800">
@@ -775,8 +775,8 @@ export default function App() {
                         </button>
                       </div>
                       <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 border-t border-slate-200 pt-5 text-sm font-semibold text-slate-700">
-                        <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-red-600" /> Georgia local delivery</span>
-                        <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-red-600" /> Pickup at your door</span>
+                        <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-red-600" /> Worldwide shipping options</span>
+                        <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-red-600" /> Personal shipping support</span>
                       </div>
                     </div>
                     <div className="relative min-h-[300px] overflow-hidden rounded-[28px] bg-slate-200 sm:min-h-[420px] lg:min-h-[500px]">
@@ -784,7 +784,7 @@ export default function App() {
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent" />
                       <div className="absolute bottom-5 left-5 right-5 rounded-2xl border border-white/30 bg-white/95 p-4 shadow-xl backdrop-blur sm:bottom-7 sm:left-7 sm:right-7 sm:p-5">
                         <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-700">Close to home. Ready to go.</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900 sm:text-base">Book a doorstep pickup anywhere in our Georgia service area.</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-900 sm:text-base">Get help preparing and sending packages to destinations around the world.</p>
                       </div>
                     </div>
                   </div>
@@ -895,8 +895,7 @@ export default function App() {
                 </span>
               </div>
               <p className="text-sm text-gray-500 leading-relaxed max-w-sm">
-                Local courier delivery, private mailbox services, and more in
-                Georgia.
+                Shipping, private mailbox services, and more with personal support.
               </p>
             </div>
             {/* Column 2: Quick Links */}

@@ -21,7 +21,6 @@ import {
   EyeOff,
 } from "lucide-react";
 import { UserRole } from "../types";
-import Logo from "../assets/logo.png";
 
 interface NavbarProps {
   activeTab: string;
@@ -115,7 +114,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     },
     {
       label: "Shipping",
-      desc: "Local courier pickup and delivery in Georgia",
+      desc: "Shipping and delivery options worldwide",
       tab: "services",
     },
     {
@@ -180,7 +179,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center gap-2.5 cursor-pointer select-none group shrink-0"
             title="JB & Best Logistics"
           >
-            <img src={Logo} alt="JB & Best Logistics logo" className="h-10 w-10 shrink-0 rounded-xl object-cover shadow-xs" />
+            <img src="/assets/logo.jpg" alt="JB & Best Logistics logo" className="h-10 w-10 shrink-0 rounded-xl object-cover shadow-xs" />
             <div className="flex items-baseline gap-1.5">
               <span className="font-display font-bold text-lg text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">
                 JB & Best
