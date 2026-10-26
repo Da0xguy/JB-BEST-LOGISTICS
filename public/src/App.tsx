@@ -818,7 +818,7 @@ export default function App() {
               {activeTab === "services" && (
                 <section className="landing-hero relative isolate overflow-hidden bg-slate-950">
                   <img
-                    src="https://images.unsplash.com/photo-1566576721346-d4a3b4eaeb55?auto=format&fit=crop&w=2000&q=85"
+                    src="https://images.unsplash.com/photo-1580674285054-bed31e145f59?auto=format&fit=crop&w=2000&q=85"
                     alt=""
                     aria-hidden="true"
                     className="absolute inset-0 h-full w-full object-cover object-center"
