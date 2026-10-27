@@ -394,8 +394,7 @@ app.get('/api/shipments', requireAuth, asyncRoute(async (req: AuthRequest, res) 
       : {};
   const shipments = await Shipment.find(filter)
     .populate({ path: 'assignedRiderId', select: 'name email phone' })
-    .sort({ createdAt: -1 })
-    .limit(100);
+    .sort({ createdAt: -1 });
   return res.json({ shipments });
 }));
 
