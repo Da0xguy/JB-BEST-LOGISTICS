@@ -64,7 +64,7 @@ const appointmentSchema = new Schema({
 export type AppointmentService = 'notary_public' | 'custom_packing' | 'mailbox_rental' | 'freight_consultation' | 'shredding_services' | 'fingerprinting' | 'livescan_fingerprinting' | 'shipping_consultation' | 'passport_photos' | 'secure_document_shredding' | 'packing_supplies' | 'fax_copies';
 
 export interface AppointmentBookingDocument extends Document {
-  customerId: mongoose.Types.ObjectId;
+  customerId?: mongoose.Types.ObjectId;
   customerName: string;
   customerEmail: string;
   customerPhone: string;
@@ -78,7 +78,7 @@ export interface AppointmentBookingDocument extends Document {
 }
 
 const appointmentBookingSchema = new Schema<AppointmentBookingDocument>({
-  customerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  customerId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
   customerName: { type: String, required: true, trim: true },
   customerEmail: { type: String, required: true, lowercase: true, trim: true },
   customerPhone: { type: String, required: true, trim: true },
@@ -168,7 +168,7 @@ riderProfileSchema.index({ currentLocation: '2dsphere' });
 
 export interface ShipmentDocument extends Document {
   trackingId: string;
-  customerId: mongoose.Types.ObjectId;
+  customerId?: mongoose.Types.ObjectId;
   sender: Record<string, unknown>;
   receiver: Record<string, unknown>;
   package: Record<string, unknown>;
@@ -196,7 +196,7 @@ export interface ShipmentDocument extends Document {
 
 const shipmentSchema = new Schema<ShipmentDocument>({
   trackingId: { type: String, required: true, unique: true, index: true },
-  customerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  customerId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
   sender: { type: addressSchema, required: true },
   receiver: { type: addressSchema, required: true },
   package: { type: packageSchema, required: true },

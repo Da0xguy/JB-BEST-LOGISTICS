@@ -24,6 +24,7 @@ interface AppointmentBookingViewProps {
     variant?: "success" | "error" | "info" | "processing",
   ) => void;
   profile?: CustomerProfile | null;
+  onRequestAccount?: () => void;
 }
 
 const SERVICES = [
@@ -140,6 +141,7 @@ export const AppointmentBookingView: React.FC<AppointmentBookingViewProps> = ({
   onAddAppointment,
   onNotify,
   profile,
+  onRequestAccount,
 }) => {
   const [selectedService, setSelectedService] =
     useState<AppointmentServiceType>("notary_public");
@@ -189,6 +191,8 @@ export const AppointmentBookingView: React.FC<AppointmentBookingViewProps> = ({
         serviceType: selectedService,
         appointmentDate: selectedDate,
         timeSlot: selectedSlot,
+        customerName: name,
+        customerEmail: email,
         customerPhone: phone,
         notes: fullNotes,
       });
@@ -228,6 +232,30 @@ export const AppointmentBookingView: React.FC<AppointmentBookingViewProps> = ({
             visit.
           </p>
         </div>
+
+        {confirmedTicket && (
+          <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 shadow-xs">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-700" />
+              <div className="flex-1">
+                <h3 className="font-bold text-emerald-950">Appointment confirmed</h3>
+                <p className="mt-1 text-sm text-emerald-900">
+                  We have reserved {confirmedTicket.timeSlot} on {confirmedTicket.appointmentDate} for you.
+                  Your confirmation email will include the appointment details.
+                </p>
+                {!profile && onRequestAccount && (
+                  <button
+                    type="button"
+                    onClick={onRequestAccount}
+                    className="mt-4 rounded-xl bg-emerald-800 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-900"
+                  >
+                    Create an account (optional)
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="rounded-[28px] border border-gray-200/80 bg-white shadow-xs">

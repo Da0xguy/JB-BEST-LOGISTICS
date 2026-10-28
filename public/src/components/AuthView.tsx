@@ -27,6 +27,7 @@ type UserRole = "customer" | "associate" | "admin";
 
 interface AuthViewProps {
   mode?: AuthMode;
+  startWithSignUp?: boolean;
   onBack: () => void;
   setPortal: (portal: Portal) => void;
   setUserRole: (role: UserRole) => void;
@@ -35,12 +36,13 @@ interface AuthViewProps {
 
 export const AuthView: React.FC<AuthViewProps> = ({
   mode = "customer",
+  startWithSignUp = false,
   onBack,
   setPortal,
   setUserRole,
   onAuthenticated,
 }) => {
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(startWithSignUp);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [verificationFlow, setVerificationFlow] = useState<
     "registration" | "password_reset" | null

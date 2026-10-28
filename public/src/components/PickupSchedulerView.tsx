@@ -33,6 +33,7 @@ interface PickupSchedulerViewProps {
     variant?: "success" | "error" | "info" | "processing",
   ) => void;
   profile?: CustomerProfile | null;
+  onRequestAccount?: () => void;
 }
 
 export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
@@ -40,6 +41,7 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
   onAddPickup,
   onNotify,
   profile,
+  onRequestAccount,
 }) => {
   // Step 1: Pickup Location & Contact
   const [businessName, setBusinessName] = useState("");
@@ -249,7 +251,7 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
           },
         });
         bookingId = booking.trackingNumber;
-        customerIdVal = booking.shipment.customerId;
+        customerIdVal = booking.shipment.customerId || "guest";
         emailNotificationFailed = booking.emailNotifications?.some(
           ({ status }) => status === "failed",
         ) ?? false;
@@ -1004,6 +1006,15 @@ export const PickupSchedulerView: React.FC<PickupSchedulerViewProps> = ({
                   </p>
                 )}
               </div>
+              {!profile && onRequestAccount && (
+                <button
+                  type="button"
+                  onClick={onRequestAccount}
+                  className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-800"
+                >
+                  Create an account (optional)
+                </button>
+              )}
             </div>
           )}
 

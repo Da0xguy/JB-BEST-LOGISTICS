@@ -445,7 +445,8 @@ export default function App() {
   };
 
   const navigateConsumerTab = (tab: string) => {
-    if (tab !== "track" && customerAccess !== "authenticated") {
+    const requiresAccount = tab === "invoices" || tab === "profile";
+    if (requiresAccount && customerAccess !== "authenticated") {
       setPendingCustomerTab(tab);
       setActiveTab("track");
       if (customerAccess === "guest") setIsAuthPageOpen(true);
@@ -741,6 +742,7 @@ export default function App() {
 
       {isAuthPageOpen && (
         <AuthView
+          startWithSignUp
           onBack={() => setIsAuthPageOpen(false)}
           setPortal={setPortal}
           setUserRole={setUserRole}
@@ -912,6 +914,7 @@ export default function App() {
                     onAddAppointment={handleAddAppointment}
                     onNotify={showToast}
                     profile={customerProfile}
+                    onRequestAccount={() => openCustomerAuth("appointment")}
                   />
                 )}
 
@@ -921,6 +924,7 @@ export default function App() {
                     onAddPickup={handleAddPickup}
                     onNotify={showToast}
                     profile={customerProfile}
+                    onRequestAccount={() => openCustomerAuth("pickup")}
                   />
                 )}
 

@@ -10,7 +10,7 @@ import mongoose from 'mongoose';
 import { config } from './config';
 import { connectDatabase } from './db';
 import { ActivityLog, AppointmentBooking, AuthVerification, MailboxProfile, Notification, Payment, PickupJob, RiderProfile, Shipment, User, type AppointmentService, type DeliveryOption, type Role, type ShipmentStatus } from './models';
-import { allowRoles, issueToken, publicUser, requireAuth, type AuthRequest } from './auth';
+import { allowRoles, issueToken, optionalAuth, publicUser, requireAuth, type AuthRequest } from './auth';
 import { calculateQuote, isAfterDropoffCutoff } from './pricing';
 import { ApiError } from './controllers/apiError';
 import v1Router from './routes/v1';
@@ -400,7 +400,7 @@ app.get('/api/shipments', requireAuth, asyncRoute(async (req: AuthRequest, res) 
 
 const serializeAppointment = (appointment: InstanceType<typeof AppointmentBooking>) => ({
   id: appointment._id.toString(),
-  customerId: appointment.customerId.toString(),
+  customerId: appointment.customerId?.toString() || '',
   customerName: appointment.customerName,
   customerEmail: appointment.customerEmail,
   customerPhone: appointment.customerPhone,
@@ -419,8 +419,8 @@ app.get('/api/appointments', requireAuth, allowRoles('customer', 'warehouse', 'w
   return res.json({ appointments: appointments.map(serializeAppointment) });
 }));
 
-app.post('/api/appointments', requireAuth, allowRoles('customer'), asyncRoute(async (req: AuthRequest, res) => {
-  const body = req.body as { serviceType?: string; appointmentDate?: string; timeSlot?: string; customerPhone?: string; notes?: string };
+app.post('/api/appointments', optionalAuth, asyncRoute(async (req: AuthRequest, res) => {
+  const body = req.body as { serviceType?: string; appointmentDate?: string; timeSlot?: string; customerName?: string; customerEmail?: string; customerPhone?: string; notes?: string };
   const services: AppointmentService[] = ['notary_public', 'custom_packing', 'mailbox_rental', 'freight_consultation', 'shredding_services', 'fingerprinting', 'livescan_fingerprinting', 'shipping_consultation', 'passport_photos', 'secure_document_shredding', 'packing_supplies', 'fax_copies'];
   const timeSlot = body.timeSlot?.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i);
   if (!services.includes(body.serviceType as AppointmentService) || !body.appointmentDate || !/^\d{4}-\d{2}-\d{2}$/.test(body.appointmentDate) || !timeSlot) {
@@ -432,13 +432,15 @@ app.post('/api/appointments', requireAuth, allowRoles('customer'), asyncRoute(as
   date.setHours(hour, Number(timeSlot[2]), 0, 0);
   if (!Number.isFinite(date.getTime()) || date <= new Date()) return res.status(400).json({ error: 'Choose a future appointment time' });
 
-  const user = req.user!;
-  const customerPhone = user.phone || body.customerPhone?.trim();
-  if (!customerPhone) return res.status(400).json({ error: 'Add a phone number to your customer profile before booking' });
+  const user = req.user;
+  const customerName = user?.name || body.customerName?.trim();
+  const customerEmail = user?.email || body.customerEmail?.trim().toLowerCase();
+  const customerPhone = user?.phone || body.customerPhone?.trim();
+  if (!customerName || !customerEmail || !customerPhone) return res.status(400).json({ error: 'Name, email, and phone number are required to book an appointment' });
   const appointment = await AppointmentBooking.create({
-    customerId: user._id,
-    customerName: user.name,
-    customerEmail: user.email,
+    customerId: user?._id,
+    customerName,
+    customerEmail,
     customerPhone,
     serviceType: body.serviceType as AppointmentService,
     appointmentDate: body.appointmentDate,
@@ -458,7 +460,7 @@ app.get('/api/shipments/track/:trackingId', asyncRoute(async (req, res) => {
 
 app.get('/api/shipments/:id/qr', requireAuth, asyncRoute(async (req: AuthRequest, res) => {
   const shipment = await Shipment.findById(req.params.id);
-  if (!shipment || (req.user!.role === 'customer' && shipment.customerId.toString() !== req.user!._id.toString())) return res.status(404).json({ error: 'Shipment not found' });
+  if (!shipment || (req.user!.role === 'customer' && (!shipment.customerId || shipment.customerId.toString() !== req.user!._id.toString()))) return res.status(404).json({ error: 'Shipment not found' });
   const dataUrl = await QRCode.toDataURL(`${config.clientOrigin}/track/${shipment.trackingId}`, { errorCorrectionLevel: 'M', margin: 1, width: 320 });
   return res.json({ trackingId: shipment.trackingId, dataUrl });
 }));
@@ -530,7 +532,7 @@ app.post('/api/payments', requireAuth, allowRoles('customer', 'warehouse', 'ware
   const { shipmentId, method, amount, installmentNumber, installmentCount } = req.body as { shipmentId: string; method: 'cash' | 'installment' | 'paystack'; amount: number; installmentNumber?: number; installmentCount?: number };
   if (!shipmentId || !['cash', 'installment', 'paystack'].includes(method) || !Number.isFinite(Number(amount))) return res.status(400).json({ error: 'Shipment, payment method, and amount are required' });
   const shipment = await Shipment.findById(shipmentId);
-  if (!shipment || (req.user!.role === 'customer' && shipment.customerId.toString() !== req.user!._id.toString())) return res.status(404).json({ error: 'Shipment not found' });
+  if (!shipment || !shipment.customerId || (req.user!.role === 'customer' && shipment.customerId.toString() !== req.user!._id.toString())) return res.status(404).json({ error: 'Shipment not found' });
   const reference = `JB-${crypto.randomBytes(10).toString('hex')}`;
   const payment = await Payment.create({ shipmentId: shipment._id, customerId: shipment.customerId, method, amount: Number(amount), installmentNumber, installmentCount, reference, status: method === 'cash' ? 'pending' : 'pending' });
   if (method === 'paystack') {

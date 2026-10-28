@@ -28,6 +28,26 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
   }
 };
 
+export const optionalAuth = async (req: AuthRequest, _res: Response, next: NextFunction) => {
+  const header = req.header('authorization');
+  if (!header?.startsWith('Bearer ')) {
+    next();
+    return;
+  }
+  try {
+    const payload = jwt.verify(header.slice(7), config.jwtSecret) as TokenPayload;
+    if (!mongoose.isValidObjectId(payload.sub)) {
+      next();
+      return;
+    }
+    const user = await User.findById(payload.sub).select('+passwordHash');
+    if (user?.status === 'active' && !user.mustChangePassword) req.user = user;
+  } catch {
+    // Guest booking remains available when an old or expired token is present.
+  }
+  next();
+};
+
 export const allowRoles = (...roles: Role[]) => (req: AuthRequest, res: Response, next: NextFunction) => {
   if (!req.user || !roles.includes(req.user.role)) return res.status(403).json({ error: 'Insufficient permissions' });
   next();

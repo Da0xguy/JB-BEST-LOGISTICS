@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { requireAuth } from '../auth';
+import { optionalAuth, requireAuth } from '../auth';
 import { acceptRiderJob, adminOnly, bookShipment, createWarehouseMailbox, customerOrWarehouse, deleteStaffAccount, getDispatchSettings, getRiderProfile, listAdminUsers, listRiderOffers, listWarehouseMailboxes, provisionStaffAccount, rejectRiderJob, riderOnly, setDispatchSettings, setRiderActiveStatus, trackShipment, updateRiderLocation, updateStaffAccountStatus, warehouseOnly } from '../controllers/v1';
 import { asyncRoute } from './asyncRoute';
 
 const router = Router();
 
-router.post('/shipments/book', requireAuth, customerOrWarehouse, asyncRoute(bookShipment));
+router.post('/shipments/book', optionalAuth, asyncRoute(bookShipment));
 router.get('/shipments/track/:trackingNumber', asyncRoute(trackShipment));
 router.patch('/riders/location', requireAuth, riderOnly, asyncRoute(updateRiderLocation));
 router.patch('/riders/status', requireAuth, riderOnly, asyncRoute(setRiderActiveStatus));

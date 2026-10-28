@@ -526,6 +526,8 @@ export const createAppointmentBooking = (appointment: {
   appointmentDate: string;
   timeSlot: string;
   customerPhone: string;
+  customerName: string;
+  customerEmail: string;
   notes?: string;
 }) =>
   apiRequest<{ appointment: Appointment }>('/api/appointments', {

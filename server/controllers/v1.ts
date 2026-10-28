@@ -87,9 +87,9 @@ export const bookShipment: RequestHandler = async (request, response) => {
     throw new ApiError(400, 'Appointment window must have a future start and a later end');
   }
 
-  const user = req.user!;
-  let customerId = user._id;
-  if (user.role !== 'customer') {
+  const user = req.user;
+  let customerId = user?.role === 'customer' ? user._id : undefined;
+  if (user && user.role !== 'customer') {
     if (!body.customerId || !mongoose.isValidObjectId(body.customerId)) throw new ApiError(400, 'A valid customerId is required for staff bookings');
     const customer = await User.findOne({ _id: body.customerId, role: 'customer', status: 'active' }).select('_id');
     if (!customer) throw new ApiError(404, 'Customer account not found');
@@ -101,7 +101,7 @@ export const bookShipment: RequestHandler = async (request, response) => {
     const warehouse = await User.exists({ _id: body.warehouseId, role: { $in: ['warehouse', 'warehouse_staff'] }, status: 'active' });
     if (!warehouse) throw new ApiError(404, 'Active warehouse account not found');
     warehouseId = new mongoose.Types.ObjectId(body.warehouseId);
-  } else if (user.role === 'warehouse' || user.role === 'warehouse_staff') {
+  } else if (user && (user.role === 'warehouse' || user.role === 'warehouse_staff')) {
     warehouseId = user._id;
   }
 
@@ -111,7 +111,7 @@ export const bookShipment: RequestHandler = async (request, response) => {
   });
   const eligibleVehicles: VehicleType[] = eligibleVehiclesForPackage(dimensions[3], packageDetails);
   const vehicleRequired = eligibleVehicles[0];
-  const initialEvent = appendTrackingEvent('booked', 'Shipment booking created', user._id.toString());
+  const initialEvent = appendTrackingEvent('booked', 'Shipment booking created', user?._id.toString() || 'guest');
   const session = await mongoose.startSession();
   let shipment: ShipmentDocument | undefined;
   let customerEmail: string | undefined;
@@ -144,13 +144,15 @@ export const bookShipment: RequestHandler = async (request, response) => {
         scheduledAt: appointmentStart,
         status: 'queued',
       }], { session });
-      await Notification.create([{
-        userId: customerId,
-        shipmentId: created._id,
-        channel: 'in_app',
-        title: 'Shipment booked',
-        body: `Tracking number ${created.trackingId} is ready.`,
-      }], { session });
+      if (customerId) {
+        await Notification.create([{
+          userId: customerId,
+          shipmentId: created._id,
+          channel: 'in_app',
+          title: 'Shipment booked',
+          body: `Tracking number ${created.trackingId} is ready.`,
+        }], { session });
+      }
       const admins = await User.find({ role: 'admin', status: 'active' }).select('_id').session(session);
       if (admins.length) {
         await Notification.create(admins.map((admin) => ({
@@ -162,10 +164,10 @@ export const bookShipment: RequestHandler = async (request, response) => {
         })), { session });
       }
 
-      const customer = await User.findById(customerId).select('email');
-      customerEmail = customer?.email;
+      const customer = customerId ? await User.findById(customerId).select('email') : null;
+      customerEmail = customer?.email || String(body.sender.email || '').trim() || undefined;
       await ActivityLog.create([{
-        actorId: user._id,
+        actorId: user?._id,
         action: 'create',
         resource: 'shipment',
         resourceId: created.id,
@@ -344,13 +346,15 @@ export const acceptRiderJob: RequestHandler = async (request, response) => {
           status: 'assigned',
         }], { session });
       }
-      await Notification.create([{
-        userId: shipment.customerId,
-        shipmentId: shipment._id,
-        channel: 'in_app',
-        title: 'Rider assigned',
-        body: `A rider has accepted pickup ${shipment.trackingId}.`,
-      }], { session });
+      if (shipment.customerId) {
+        await Notification.create([{
+          userId: shipment.customerId,
+          shipmentId: shipment._id,
+          channel: 'in_app',
+          title: 'Rider assigned',
+          body: `A rider has accepted pickup ${shipment.trackingId}.`,
+        }], { session });
+      }
     });
   } finally {
     await session.endSession();
@@ -359,7 +363,9 @@ export const acceptRiderJob: RequestHandler = async (request, response) => {
   const committedShipment = await Shipment.findById(acceptedShipmentId);
   if (!committedShipment) throw new ApiError(404, 'Accepted shipment could not be loaded');
   emitToShipment(committedShipment._id.toString(), 'tracking:status', { trackingNumber: committedShipment.trackingId, status: committedShipment.status, history: committedShipment.tracking_history });
-  emitToUser(committedShipment.customerId.toString(), 'shipment:assigned', { trackingNumber: committedShipment.trackingId, status: committedShipment.status });
+  if (committedShipment.customerId) {
+    emitToUser(committedShipment.customerId.toString(), 'shipment:assigned', { trackingNumber: committedShipment.trackingId, status: committedShipment.status });
+  }
   void dispatchQueuedShipments().catch((error: unknown) => console.error('Queued dispatch retry failed', error));
   return response.json({ shipment: committedShipment });
 };
