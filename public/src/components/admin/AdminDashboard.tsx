@@ -237,23 +237,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const refreshServerPickups = async () => {
     try {
-      const [{ jobs }, { notifications }] = await Promise.all([
-        listAdminPickupJobs(),
-        listAdminNotifications(),
-      ]);
+      const { jobs } = await listAdminPickupJobs();
       setServerPickupJobs(jobs.filter((job) => job.shipmentId));
-      setAdminNotifications(notifications);
       setDispatchLoadError("");
     } catch (error) {
       setDispatchLoadError(error instanceof Error ? error.message : "Unable to load saved pickup orders");
     }
   };
 
+  const refreshAdminNotifications = async () => {
+    try {
+      const { notifications } = await listAdminNotifications();
+      setAdminNotifications(notifications);
+    } catch (error) {
+      setDispatchLoadError(error instanceof Error ? error.message : "Unable to load admin notifications");
+    }
+  };
+
   useEffect(() => {
     void refreshServerPickups();
+    void refreshAdminNotifications();
     getDispatchSettings().then(({ autoDispatchEnabled: enabled }) => setAutoDispatchEnabled(enabled)).catch(() => {});
-    const timer = window.setInterval(() => void refreshServerPickups(), 30000);
-    return () => window.clearInterval(timer);
+    const timer = window.setInterval(() => {
+      void refreshServerPickups();
+      void refreshAdminNotifications();
+    }, 15000);
+    const handleWindowFocus = () => {
+      void refreshServerPickups();
+      void refreshAdminNotifications();
+    };
+    window.addEventListener("focus", handleWindowFocus);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
   }, []);
 
   const pendingServerPickups = serverPickupJobs.filter((job) =>

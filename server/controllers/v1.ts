@@ -187,14 +187,14 @@ export const bookShipment: RequestHandler = async (request, response) => {
       recipient: 'admin' as const,
       email: process.env.ADMIN_EMAIL?.trim() || 'jb.bestlogistics@gmail.com',
       subject: `New pickup awaiting assignment: ${shipment.trackingId}`,
-      html: `<p>A new pickup order is awaiting assignment.</p><p>Tracking ID: ${shipment.trackingId}</p>`,
+      html: `<p>A new pickup order is awaiting rider assignment.</p><p><strong>Tracking ID:</strong> ${escapeHtml(shipment.trackingId)}</p><p><strong>Pickup address:</strong> ${escapeHtml(String(shipment.sender.street || ''))}, ${escapeHtml(String(shipment.sender.city || ''))}, ${escapeHtml(String(shipment.sender.state || ''))}</p><p><strong>Scheduled pickup:</strong> ${escapeHtml(appointmentStart.toLocaleString())}</p>`,
     },
     ...(customerEmail
       ? [{
           recipient: 'customer' as const,
           email: customerEmail,
           subject: `Your shipment ${shipment.trackingId} is booked`,
-          html: `<p>Dear customer,</p><p>Your shipment has been successfully booked. Tracking ID: ${shipment.trackingId}</p>`,
+          html: `<p>Dear ${escapeHtml(String(shipment.sender.name || 'customer'))},</p><p>Your pickup order has been successfully booked and is waiting for rider assignment.</p><p><strong>Tracking ID:</strong> ${escapeHtml(shipment.trackingId)}</p><p><strong>Pickup address:</strong> ${escapeHtml(String(shipment.sender.street || ''))}, ${escapeHtml(String(shipment.sender.city || ''))}, ${escapeHtml(String(shipment.sender.state || ''))}</p><p><strong>Scheduled pickup:</strong> ${escapeHtml(appointmentStart.toLocaleString())}</p><p>We will notify you when a rider is assigned.</p>`,
         }]
       : []),
   ].map(async ({ recipient, email, subject, html }) => {
