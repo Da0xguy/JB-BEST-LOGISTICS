@@ -259,6 +259,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const pendingServerPickups = serverPickupJobs.filter((job) =>
     job.status === "queued" && job.shipmentId && !job.shipmentId.assignedRiderId
   );
+  const waitingPickupCount =
+    localPickups.filter(
+      (pickup) =>
+        !pickup.assignedDriverId &&
+        pickup.status !== "completed" &&
+        pickup.status !== "cancelled",
+    ).length + pendingServerPickups.length;
 
   useEffect(() => {
     if (activeAdminTab !== "staff" && activeAdminTab !== "dispatch") return;
@@ -553,7 +560,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         onSelect={(tab) => setActiveAdminTab(tab as typeof activeAdminTab)}
         items={[
           { id: "kpis", label: "Executive Analytics", icon: BarChart3 },
-          { id: "dispatch", label: `Dispatch pickups (${localPickups.filter((p) => !p.assignedDriverId).length} waiting)`, icon: Zap },
+          { id: "dispatch", label: `Dispatch pickups (${waitingPickupCount} waiting)`, icon: Zap },
           { id: "activities", label: `Staff Activity Monitor (${staffActivities.length})`, icon: Activity },
           { id: "staff", label: "Team & Accounts", icon: Users },
           { id: "shipments", label: "Shipments & Manifests", icon: Package },
