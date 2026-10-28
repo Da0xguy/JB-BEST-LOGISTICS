@@ -31,6 +31,7 @@ import {
 
   Navigation,
   Bell,
+  X,
 } from "lucide-react";
 import { DashboardSidebar } from "../DashboardSidebar";
 import {
@@ -203,6 +204,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [autoDispatchEnabled, setAutoDispatchEnabled] = useState(true);
   const [isSavingDispatchSetting, setIsSavingDispatchSetting] = useState(false);
   const [selectedRiderId, setSelectedRiderId] = useState("");
+  const [selectedRiderByPickup, setSelectedRiderByPickup] = useState<Record<string, string>>({});
+  const [showDispatchModal, setShowDispatchModal] = useState(false);
 
   const [invoiceFilter, setInvoiceFilter] = useState<
     "all" | "paid" | "pending"
@@ -285,9 +288,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     };
   }, [activeAdminTab]);
 
-  const assignQueuedServerPickup = async (job: AdminPickupJob) => {
+  const assignQueuedServerPickup = async (job: AdminPickupJob, riderId = selectedRiderByPickup[job._id] || selectedRiderId) => {
     const shipment = job.shipmentId;
-    const rider = activeRiders.find((candidate) => candidate.id === selectedRiderId);
+    const rider = activeRiders.find((candidate) => candidate.id === riderId);
     if (!shipment || !rider) {
       setDispatchNotice("Choose an active rider who is open for delivery before assigning this pickup.");
       return;
@@ -544,10 +547,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <DashboardSidebar
         title="Admin Console"
         activeItem={activeAdminTab}
-        onSelect={(tab) => setActiveAdminTab(tab as typeof activeAdminTab)}
+        onSelect={(tab) => {
+          if (tab === "dispatch") {
+            setShowDispatchModal(true);
+            return;
+          }
+          setActiveAdminTab(tab as typeof activeAdminTab);
+        }}
         items={[
           { id: "kpis", label: "Executive Analytics", icon: BarChart3 },
-          { id: "dispatch", label: `Auto-Dispatch Hub (${localPickups.filter((p) => !p.assignedDriverId).length} open)`, icon: Zap },
+          { id: "dispatch", label: `Dispatch pickups (${localPickups.filter((p) => !p.assignedDriverId).length} waiting)`, icon: Zap },
           { id: "activities", label: `Staff Activity Monitor (${staffActivities.length})`, icon: Activity },
           { id: "staff", label: "Team & Accounts", icon: Users },
           { id: "shipments", label: "Shipments & Manifests", icon: Package },
@@ -568,7 +577,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
       {dispatchLoadError && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{dispatchLoadError}</p>}
-      {pendingServerPickups.length > 0 && <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><h2 className="font-bold text-amber-950">Awaiting rider assignment ({pendingServerPickups.length})</h2><ul className="mt-2 space-y-2">{pendingServerPickups.map((job) => <li key={job._id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3 text-sm"><span><strong className="font-mono">{job.shipmentId!.trackingId}</strong> · {job.shipmentId!.sender?.name || "Customer"} · {job.shipmentId!.receiver?.city || "Delivery"}<span className="block text-xs text-gray-500">{job.scheduledAt ? new Date(job.scheduledAt).toLocaleString() : "Scheduled"}</span></span><div className="flex flex-wrap items-center gap-2"><select aria-label={`Select rider for ${job.shipmentId!.trackingId}`} value={selectedRiderId} onChange={(event) => setSelectedRiderId(event.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs"><option value="">Choose available rider</option>{activeRiders.map((rider) => <option key={rider.id} value={rider.id}>{rider.name}</option>)}</select><button type="button" onClick={() => void assignQueuedServerPickup(job)} disabled={!activeRiders.length || !selectedRiderId} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Assign pickup</button></div></li>)}</ul><button type="button" onClick={() => void refreshServerPickups()} className="mt-3 text-xs font-semibold text-blue-700">Refresh pickup orders</button></section>}
+      {pendingServerPickups.length > 0 && <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><h2 className="font-bold text-amber-950">Awaiting rider assignment ({pendingServerPickups.length})</h2><p className="mt-1 text-xs text-amber-800">Open Dispatch pickups to assign these orders.</p></section>}
       {/* Top Executive KPI Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-3xl border border-gray-200/80 p-5 shadow-xs space-y-2">
@@ -1558,6 +1567,173 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showDispatchModal && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="dispatch-selection-title"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowDispatchModal(false);
+          }}
+        >
+          <div className="flex max-h-[min(90svh,760px)] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+            <header className="flex items-start justify-between gap-4 border-b border-slate-100 p-5 sm:p-6">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-600">
+                  Pickup dispatch
+                </p>
+                <h2 id="dispatch-selection-title" className="mt-1 text-xl font-bold text-slate-900">
+                  Assign waiting pickup orders
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Choose an available pickup driver for each waiting order.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDispatchModal(false)}
+                aria-label="Close dispatch selection"
+                className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+
+            <div className="overflow-y-auto p-5 sm:p-6">
+              {dispatchNotice && (
+                <p role="status" className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs font-semibold text-blue-900">
+                  {dispatchNotice}
+                </p>
+              )}
+
+              <div className="mb-5 flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div>
+                  <p className="text-sm font-bold text-slate-900">Automatic rider dispatch</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Automatically offer new pickup orders to riders who are available.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={autoDispatchEnabled}
+                  disabled={isSavingDispatchSetting}
+                  onClick={() => void toggleAutoDispatch()}
+                  className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition disabled:opacity-60 ${
+                    autoDispatchEnabled
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border-slate-200 bg-white text-slate-600"
+                  }`}
+                >
+                  <span className={`relative h-5 w-9 rounded-full transition ${autoDispatchEnabled ? "bg-emerald-600" : "bg-slate-400"}`}>
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${autoDispatchEnabled ? "left-[18px]" : "left-0.5"}`} />
+                  </span>
+                  {autoDispatchEnabled ? "On" : "Off"}
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {localPickups
+                  .filter((pickup) => !pickup.assignedDriverId && pickup.status !== "completed" && pickup.status !== "cancelled")
+                  .map((pickup) => {
+                    const riderId = selectedRiderByPickup[pickup.id] || "";
+                    return (
+                      <div key={pickup.id} className="rounded-2xl border border-slate-200 p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="font-mono text-xs font-bold text-slate-900">{pickup.trackingNumber || pickup.id}</p>
+                            <p className="mt-1 text-sm font-semibold text-slate-900">{pickup.contactName}</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {pickup.pickupAddress.street}, {pickup.pickupAddress.city} · {pickup.estimatedPackagesCount} package(s) · {pickup.totalWeightLbs} lbs
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 flex-col gap-2 sm:min-w-56">
+                            <select
+                              aria-label={`Choose pickup driver for ${pickup.trackingNumber || pickup.id}`}
+                              value={riderId}
+                              onChange={(event) => setSelectedRiderByPickup((current) => ({ ...current, [pickup.id]: event.target.value }))}
+                              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                            >
+                              <option value="">Choose available pickup driver</option>
+                              {activeRiders.map((rider) => <option key={rider.id} value={rider.id}>{rider.name}</option>)}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleAutoAssignSingle(pickup, riderId);
+                                setSelectedRiderByPickup((current) => {
+                                  const next = { ...current };
+                                  delete next[pickup.id];
+                                  return next;
+                                });
+                              }}
+                              disabled={!riderId}
+                              className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Assign pickup driver
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                {pendingServerPickups.map((job) => {
+                  const shipment = job.shipmentId;
+                  if (!shipment) return null;
+                  const riderId = selectedRiderByPickup[job._id] || "";
+                  return (
+                    <div key={job._id} className="rounded-2xl border border-amber-200 bg-amber-50/40 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-mono text-xs font-bold text-slate-900">{shipment.trackingId}</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-900">{shipment.sender?.name || "Customer pickup"}</p>
+                          <p className="mt-1 text-xs text-slate-500">{shipment.sender?.street}, {shipment.sender?.city} · Scheduled {new Date(job.scheduledAt).toLocaleString()}</p>
+                        </div>
+                        <div className="flex shrink-0 flex-col gap-2 sm:min-w-56">
+                          <select
+                            aria-label={`Choose pickup driver for ${shipment.trackingId}`}
+                            value={riderId}
+                            onChange={(event) => setSelectedRiderByPickup((current) => ({ ...current, [job._id]: event.target.value }))}
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                          >
+                            <option value="">Choose available pickup driver</option>
+                            {activeRiders.map((rider) => <option key={rider.id} value={rider.id}>{rider.name}</option>)}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => void assignQueuedServerPickup(job, riderId)}
+                            disabled={!riderId}
+                            className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Assign pickup driver
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {!localPickups.some((pickup) => !pickup.assignedDriverId && pickup.status !== "completed" && pickup.status !== "cancelled") && pendingServerPickups.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center">
+                    <p className="text-sm font-semibold text-slate-700">No pickup orders are waiting for dispatch.</p>
+                    <p className="mt-1 text-xs text-slate-500">New pickup orders will appear here when they are ready for assignment.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <footer className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:px-6">
+              <span className="text-xs text-slate-500">{activeRiders.length} available pickup driver(s)</span>
+              <button type="button" onClick={() => void refreshServerPickups()} className="text-xs font-bold text-blue-700 hover:text-blue-800">
+                Refresh orders
+              </button>
+            </footer>
           </div>
         </div>
       )}
