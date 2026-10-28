@@ -486,6 +486,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (dispatchFilter === "cash_onsite") return p.paymentMethod === "cash_onsite";
     return true;
   });
+  const filteredServerPickups = serverPickupJobs.filter((job) => {
+    if (dispatchFilter === "pending") return job.status === "queued";
+    if (dispatchFilter === "assigned") return job.status === "assigned";
+    if (dispatchFilter === "carrier_tender" || dispatchFilter === "cash_onsite") return false;
+    return job.status === "queued" || job.status === "assigned";
+  });
 
   const filteredActivities = staffActivities.filter((act) => {
     if (activityStaffFilter !== "all" && act.staffId !== activityStaffFilter) {
@@ -568,7 +574,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
       {dispatchLoadError && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{dispatchLoadError}</p>}
-      {pendingServerPickups.length > 0 && <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><h2 className="font-bold text-amber-950">Awaiting rider assignment ({pendingServerPickups.length})</h2><ul className="mt-2 space-y-2">{pendingServerPickups.map((job) => <li key={job._id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3 text-sm"><span><strong className="font-mono">{job.shipmentId!.trackingId}</strong> · {job.shipmentId!.sender?.name || "Customer"} · {job.shipmentId!.receiver?.city || "Delivery"}<span className="block text-xs text-gray-500">{job.scheduledAt ? new Date(job.scheduledAt).toLocaleString() : "Scheduled"}</span></span><div className="flex flex-wrap items-center gap-2"><select aria-label={`Select rider for ${job.shipmentId!.trackingId}`} value={selectedRiderByPickup[job._id] || ""} onChange={(event) => setSelectedRiderByPickup((current) => ({ ...current, [job._id]: event.target.value }))} className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs"><option value="">Choose available rider</option>{activeRiders.map((rider) => <option key={rider.id} value={rider.id}>{rider.name}</option>)}</select><button type="button" onClick={() => void assignQueuedServerPickup(job)} disabled={!activeRiders.length || !selectedRiderByPickup[job._id]} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Assign pickup</button></div></li>)}</ul><button type="button" onClick={() => void refreshServerPickups()} className="mt-3 text-xs font-semibold text-blue-700">Refresh pickup orders</button></section>}
       {/* Top Executive KPI Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-3xl border border-gray-200/80 p-5 shadow-xs space-y-2">
@@ -676,17 +681,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* Dispatch Queue Filter Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
             {[
-              { id: "all", label: `All Orders (${localPickups.length})` },
+              { id: "all", label: `All Orders (${localPickups.length + serverPickupJobs.filter((job) => job.status === "queued" || job.status === "assigned").length})` },
               {
                 id: "pending",
                 label: `Awaiting Rider (${
-                  localPickups.filter((p) => !p.assignedDriverId).length
+                  localPickups.filter((p) => !p.assignedDriverId).length + pendingServerPickups.length
                 })`,
               },
               {
                 id: "assigned",
                 label: `Assigned (${
-                  localPickups.filter((p) => !!p.assignedDriverId).length
+                  localPickups.filter((p) => !!p.assignedDriverId).length + serverPickupJobs.filter((job) => job.status === "assigned").length
                 })`,
               },
               {
@@ -714,8 +719,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* Pickups Matrix */}
           <div className="space-y-4">
-            {filteredPickups.length > 0 ? (
-              filteredPickups.map((p) => {
+            {filteredPickups.length > 0 || filteredServerPickups.length > 0 ? (
+              <>
+              {filteredServerPickups.map((job) => {
+                const shipment = job.shipmentId;
+                if (!shipment) return null;
+                const isServerAssigned = job.status === "assigned" || Boolean(shipment.assignedRiderId);
+                return (
+                  <div key={job._id} className="p-5 rounded-3xl border border-amber-200 bg-amber-50/40 shadow-xs space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-amber-200">
+                      <div>
+                        <span className="font-mono text-xs font-bold text-gray-900 bg-white px-2.5 py-1 rounded-lg">{shipment.trackingId}</span>
+                        <p className="mt-2 font-bold text-gray-900">{shipment.sender?.name || "Customer pickup"}</p>
+                        <p className="mt-1 text-xs text-gray-500">{shipment.sender?.street}, {shipment.sender?.city} · Scheduled {new Date(job.scheduledAt).toLocaleString()}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase ${isServerAssigned ? "bg-purple-100 text-purple-900" : "bg-amber-100 text-amber-900"}`}>{isServerAssigned ? "Assigned" : "Waiting for rider"}</span>
+                        {isServerAssigned ? (
+                          <span className="text-xs font-bold text-purple-700">{typeof shipment.assignedRiderId === "string" ? shipment.assignedRiderId : shipment.assignedRiderId?.name || "Rider assigned"}</span>
+                        ) : (
+                          <>
+                            <select aria-label={`Select rider for ${shipment.trackingId}`} value={selectedRiderByPickup[job._id] || ""} onChange={(event) => setSelectedRiderByPickup((current) => ({ ...current, [job._id]: event.target.value }))} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs">
+                              <option value="">Choose available rider</option>
+                              {activeRiders.map((rider) => <option key={rider.id} value={rider.id}>{rider.name}</option>)}
+                            </select>
+                            <button type="button" onClick={() => void assignQueuedServerPickup(job)} disabled={!selectedRiderByPickup[job._id]} className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">Assign pickup</button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {filteredPickups.map((p) => {
                 const isAssigned = Boolean(p.assignedDriverId);
 
                 return (
@@ -857,7 +893,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
                   </div>
                 );
-              })
+              })}
+              </>
             ) : (
               <div className="p-12 text-center bg-white rounded-3xl border border-gray-200 text-gray-500">
                 <Truck className="w-8 h-8 text-gray-300 mx-auto mb-2" />
